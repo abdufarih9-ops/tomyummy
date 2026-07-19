@@ -2,7 +2,6 @@ const CACHE_NAME = 'kedai-cache-v2';
 const ASSETS_TO_CACHE = [
     './',
     './manifest.json',
-    './menu.json',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js'
 ];
