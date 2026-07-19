@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistem Kedai & QR Menu V8 (Super Pro - Edit, Recipe & Print)</title>
+    
+    <!-- PWA Manifest & PWA Meta Tags -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#e74c3c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Pustaka jsPDF untuk Cetak PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        /* ================= CSS DASAR ================= */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #f4f6f8; color: #333; overflow-x: hidden; }
+        
+        /* NAVBAR & SIDEBAR (NAVIGASI) */
+        header { background-color: #e74c3c; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .menu-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+        .sidebar { position: fixed; top: 0; left: -250px; width: 250px; height: 100%; background: #2c3e50; color: white; transition: 0.3s; z-index: 200; overflow-y: auto; padding-top: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
+        .sidebar.active { left: 0; }
+        .sidebar a { display: block; color: white; padding: 15px 20px; text-decoration: none; border-bottom: 1px solid #34495e; font-size: 16px; }
+        .sidebar a:hover, .sidebar a.active { background: #e74c3c; }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 24px; background: none; border: none; color: white; cursor: pointer; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 150; }
+        .overlay.active { display: block; }
+
+        /* KONTEN HALAMAN */
+        .page { display: none; padding: 15px; max-width: 800px; margin: auto; }
+        .page.active { display: block; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2.page-title { margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
+
+        /* TAB MENU & GRID */
+        .tabs { display: flex; margin-bottom: 15px; border-radius: 6px; overflow: hidden; gap: 2px; }
+        .tab-btn { flex: 1; padding: 12px 2px; border: none; background: #bdc3c7; color: #333; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;}
+        .tab-btn.active { background: #e74c3c; color: white; }
+        
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        
+        /* TAMPILAN KOTAK MENU */
+        .menu-item { 
+            background: #fff; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; 
+            border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: space-between;
+            height: 100%; min-height: 190px; transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+        }
+        .menu-item:active { transform: scale(0.95); border-color: #e74c3c; box-shadow: 0 0 8px rgba(231,76,60,0.3); }
+        .menu-item img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; background: #eee;}
+        .menu-item .no-image { width: 100%; height: 100px; background: #ecf0f1; border-radius: 6px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; color: #7f8c8d; font-size: 11px; }
+        .menu-item h4 { font-size: 13px; margin-bottom: 5px; color: #2c3e50; min-height: 38px; }
+        .menu-item p { color: #e74c3c; font-weight: bold; font-size: 14px; margin-bottom: 0; }
+        
+        /* TOPPING / SEBLAK BUILDER */
+        .seblak-builder { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e74c3c; margin-bottom: 15px; }
+        .builder-step { margin-bottom: 20px; }
+        .builder-step h4 { margin-bottom: 12px; color: #2c3e50; border-bottom: 1px solid #ecf0f1; padding-bottom: 5px; font-size: 15px; }
+        .checklist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .check-item { display: flex; align-items: flex-start; background: #ecf0f1; padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s;}
+        .check-item:hover { border-color: #bdc3c7; }
+        .check-item input[type="checkbox"] { margin-right: 10px; margin-top: 3px; transform: scale(1.2); cursor: pointer; accent-color: #e74c3c; }
+        .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .radio-item { background: #fdf2e9; padding: 10px 15px; border-radius: 20px; border: 1px solid #e67e22; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: 0.2s;}
+        .radio-item:hover { background: #fae5d3; }
+        .radio-item input[type="radio"] { margin-right: 8px; accent-color: #e67e22; transform: scale(1.2); cursor: pointer;}
+        .btn-add-seblak { background: #e74c3c; color: white; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 5px;}
+
+        /* KERANJANG */
+        .cart-item { display: flex; flex-direction: column; padding: 12px 0; border-bottom: 1px dashed #bdc3c7; }
+        .cart-item-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .cart-controls button { background: #bdc3c7; border: none; padding: 5px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 16px;}
+        .cart-note-input { width: 100%; margin-top: 8px; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 12px; background: #fdfefe; }
+        .btn-checkout { background: #e74c3c; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 10px; cursor: pointer;}
+        .btn-order-customer { background: #27ae60; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 10px; cursor: pointer;}
+
+        /* TABEL & FORM */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 8px; text-align: left; vertical-align: middle; }
+        th { background: #2c3e50; color: white; }
+        
+        .table-order { table-layout: fixed; }
+        .table-order th, .table-order td { word-wrap: break-word; }
+        .col-meja { width: 22%; }
+        .col-pesanan { width: 40%; }
+        .col-total { width: 20%; }
+        .col-status { width: 18%; }
+
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 13px; margin-bottom: 5px; font-weight: bold; color: #34495e;}
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 14px;}
+        
+        .btn-action { background: #2980b9; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-edit { background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; margin-bottom: 5px;}
+        .btn-delete { background: #c0392b; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;}
+        .btn-selesai { background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; margin-bottom: 5px;}
+        .btn-batal { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%;}
+        .btn-print { background: #8e44ad; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%; margin-bottom: 5px;}
+        .btn-print-dapur { background: #2980b9; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%; margin-bottom: 5px;}
+        
+        /* STATUS ORDER */
+        .badge-pending { background: #f39c12; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; display: inline-block; text-align: center; width:100%; margin-bottom: 5px;}
+        .badge-done { background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; display: inline-block; text-align: center; width:100%;}
+        .badge-cancel { background: #7f8c8d; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; display: inline-block; text-align: center; width:100%;}
+
+        /* GRID TANGGAL */
+        .date-filter-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR ATAS -->
+    <header id="main-header">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <h3 style="margin: 0;" id="app-title">Sistem Kedai & Seblak</h3>
+        <div style="width: 24px;"></div>
+    </header>
+
+    <!-- SIDEBAR NAVIGASI -->
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+    <nav class="sidebar" id="sidebar">
+        <button class="close-btn" onclick="toggleMenu()">✕</button>
+        <a href="#" onclick="nav('kasir')" class="active" id="nav-kasir">💰 Kasir (POS)</a>
+        <a href="#" onclick="nav('order')">📥 Order Masuk <span id="notif-order" style="background:red;border-radius:50%;padding:2px 6px;font-size:12px;display:none;">!</span></a>
+        <a href="#" onclick="nav('qr')">📱 QR Code Meja</a>
+        <a href="#" onclick="nav('master')">📋 Master Menu</a>
+        <a href="#" onclick="nav('stok')">📦 Stok Bahan Baku</a>
+        <a href="#" onclick="nav('pengeluaran')">💸 Pengeluaran Baru</a>
+        <a href="#" onclick="nav('laporan')">📊 Laporan & Cetak PDF</a>
+        <a href="#" onclick="nav('terjual')">🔥 Item Terlaris</a>
+    </nav>
+
+    <!-- ================= HALAMAN KASIR UTAMA ================= -->
+    <main class="page active" id="page-kasir">
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-biasa" onclick="switchTab('biasa', 'kasir')">🍱 Makanan</button>
+            <button class="tab-btn" id="tab-seblak" onclick="switchTab('seblak', 'kasir')">🥘 Seblak</button>
+            <button class="tab-btn" id="tab-cemilan" onclick="switchTab('cemilan', 'kasir')">🍿 Cemilan</button>
+            <button class="tab-btn" id="tab-minuman" onclick="switchTab('minuman', 'kasir')">🍹 Minuman</button>
+        </div>
+        <div class="card">
+            <div id="menu-container-kasir" class="menu-grid"></div>
+            <div id="seblak-builder-kasir" class="seblak-builder" style="display: none;"></div>
+        </div>
+        <div class="card">
+            <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;">Daftar Pesanan (Kasir)</h3>
+            <div id="cart-list-kasir" style="max-height: 350px; overflow-y: auto;"></div>
+            
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Metode Pembayaran</label>
+                <select id="kasir-payment">
+                    <option value="Tunai">Tunai</option>
+                    <option value="QRIS">QRIS / E-Wallet</option>
+                    <option value="Transfer">Transfer Bank</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Sumber Order</label>
+                <select id="kasir-source">
+                    <option value="Offline">Offline / Dine-in / Takeaway</option>
+                    <option value="ShopeeFood">ShopeeFood</option>
+                    <option value="GoFood">GoFood</option>
+                    <option value="GrabFood">GrabFood</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Catatan Tambahan Transaksi</label>
+                <textarea id="kasir-note" rows="2" placeholder="Catatan untuk struk/dapur..."></textarea>
+            </div>
+
+            <div style="background: #fdf2e9; padding: 15px; border-radius: 6px; text-align: right; margin-top: 10px;">
+                Total Bayar: <h2 id="total-price-kasir" style="color: #d35400;">Rp 0</h2>
+            </div>
+            <button class="btn-checkout" onclick="prosesTransaksi('Kasir')">Proses Pembayaran & Cetak Kasir</button>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN QR CODE MEJA ================= -->
+    <main class="page" id="page-qr">
+        <h2 class="page-title">Generate QR Code Meja</h2>
+        <div class="card">
+            <p style="font-size: 13px; margin-bottom: 15px; color: #7f8c8d;">Cetak QR Code ini dan tempel di meja. Pelanggan cukup scan untuk memesan.</p>
+            <div class="form-group">
+                <label>Nomor / Nama Meja</label>
+                <input type="text" id="qr-input-meja" placeholder="Contoh: Meja 01">
+            </div>
+            <button class="btn-action" onclick="generateQR()" style="width:100%; margin-bottom: 15px;">Buat QR Code</button>
+            
+            <div id="qr-result-box" style="display: none; text-align: center; border: 2px dashed #bdc3c7; padding: 20px; border-radius: 8px;">
+                <h3 id="qr-meja-label" style="margin-bottom: 10px;"></h3>
+                <img id="qr-image" src="" alt="QR Code" style="width: 200px; height: 200px; margin-bottom: 15px;">
+                <br>
+                <button class="btn-action" style="background:#27ae60;" onclick="bukaSimulasiPelanggan()">Lihat Tampilan HP Pelanggan</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN SIMULASI PELANGGAN ================= -->
+    <main class="page" id="page-customer">
+        <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; text-align: center;">
+            <b>SIMULASI PELANGGAN</b><br>Layar pesanan dari HP Pelanggan
+        </div>
+        <h2 class="page-title" id="cust-meja-title">Menu Utama</h2>
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-biasa-cust" onclick="switchTab('biasa', 'customer')">🍱 Makanan</button>
+            <button class="tab-btn" id="tab-seblak-cust" onclick="switchTab('seblak', 'customer')">🥘 Seblak</button>
+            <button class="tab-btn" id="tab-cemilan-cust" onclick="switchTab('cemilan', 'customer')">🍿 Cemilan</button>
+            <button class="tab-btn" id="tab-minuman-cust" onclick="switchTab('minuman', 'customer')">🍹 Minuman</button>
+        </div>
+        <div class="card">
+            <div id="menu-container-cust" class="menu-grid"></div>
+            <div id="seblak-builder-cust" class="seblak-builder" style="display: none;"></div>
+        </div>
+        <div class="card">
+            <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;">Keranjang Saya</h3>
+            <div id="cart-list-cust" style="max-height: 350px; overflow-y: auto;"></div>
+            
+            <div class="form-group" style="margin-top: 15px; background: #ecf0f1; padding: 10px; border-radius: 6px;">
+                <label>Catatan Khusus Pesanan</label>
+                <textarea id="cust-note" rows="2" placeholder="Contoh: Tolong kerupuknya di pisah..."></textarea>
+            </div>
+
+            <div style="background: #e8f8f5; padding: 15px; border-radius: 6px; text-align: right; margin-top: 10px;">
+                Total Tagihan: <h2 id="total-price-cust" style="color: #16a085;">Rp 0</h2>
+            </div>
+            <button class="btn-order-customer" onclick="kirimPesananKeKasir()">Kirim Pesanan ke Dapur 🚀</button>
+            <button class="btn-action btn-tutup-simulasi" style="background:#7f8c8d; width:100%; margin-top:10px;" onclick="tutupSimulasi()">Kembali ke Mode Kasir</button>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN ORDER MASUK (KASIR) ================= -->
+    <main class="page" id="page-order">
+        <h2 class="page-title">Order Masuk (Dapur & Kasir)</h2>
+        <div class="card" style="overflow-x: auto;">
+            <table id="table-order" class="table-order">
+                <thead>
+                    <tr>
+                        <th class="col-meja">Meja & Info</th>
+                        <th class="col-pesanan">Pesanan & Catatan</th>
+                        <th class="col-total">Total</th>
+                        <th class="col-status">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN MASTER MENU ================= -->
+    <main class="page" id="page-master">
+        <h2 class="page-title">Kelola Master Menu</h2>
+        <div class="card" id="form-master-menu">
+            <div style="background: #e8f8f5; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none;" id="alert-edit">
+                <b>Mode Edit:</b> Mengubah data menu. <button onclick="batalEditMenu()" style="margin-left:10px; padding:2px 5px; font-size:11px;">Batal</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Nama Menu / Bahan Topping</label>
+                <input type="text" id="m-nama" placeholder="Cth: Nasi Goreng Ayam">
+            </div>
+            <div class="form-group">
+                <label>Kategori</label>
+                <select id="m-kategori">
+                    <option value="biasa">Makanan Biasa</option>
+                    <option value="seblak">Seblak Prasmanan / Isian Topping</option>
+                    <option value="cemilan">Cemilan / Snack</option>
+                    <option value="minuman">Minuman</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Harga Jual (Rp)</label>
+                <input type="number" id="m-harga" placeholder="Cth: 15000">
+            </div>
+            <div class="form-group">
+                <label>Link Foto URL (Opsional)</label>
+                <input type="text" id="m-img" placeholder="Contoh: https://i.ibb.co/foto-menu.jpg">
+            </div>
+            
+            <!-- Sistem Kondimen / Bahan Baku -->
+            <div class="form-group" style="background:#ecf0f1; padding:15px; border-radius:6px; border:1px solid #bdc3c7;">
+                <label style="color:#2980b9;">🛠️ Resep Bahan Baku (Sistem Kondimen)</label>
+                <p style="font-size:11px; margin-bottom:10px; color:#7f8c8d;">Tambahkan bahan baku agar stok otomatis berkurang sesuai porsi. (Bahan baku harus terdaftar di halaman "Stok Bahan Baku").</p>
+                
+                <div id="resep-container"></div>
+                <button class="btn-action" style="background:#27ae60; font-size:12px; padding:6px 12px; margin-top:5px;" onclick="tambahBarisResep()">+ Tambah Bahan Baku</button>
+            </div>
+
+            <button class="btn-action" id="btn-simpan-menu" onclick="simpanMenuData()" style="width: 100%; margin-top:10px; font-size: 15px;">+ Simpan Menu</button>
+        </div>
+        <div class="card" style="overflow-x: auto;">
+            <table id="table-menu">
+                <thead>
+                    <tr>
+                        <th style="width:60px;">Foto</th>
+                        <th>Nama Menu</th>
+                        <th>Kategori</th>
+                        <th>Harga & Resep</th>
+                        <th style="width:80px; text-align:center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN STOK ================= -->
+    <main class="page" id="page-stok">
+        <h2 class="page-title">Kelola Stok Bahan Baku</h2>
+        <div class="card">
+            <p style="font-size: 12px; margin-bottom: 10px;">Daftarkan nama bahan baku mentah (cth: Beras, Mie, Telur) atau menu jadi di sini agar bisa dipilih di form Resep Master Menu.</p>
+            <div class="form-group">
+                <label>Nama Bahan Baku (Baru / Tersedia)</label>
+                <input type="text" id="s-nama-baru" placeholder="Ketik nama bahan baku baru...">
+            </div>
+            <div class="form-group">
+                <label>Jumlah Masuk (Pcs/Porsi/Gram)</label>
+                <input type="number" id="s-qty" placeholder="Masukkan jumlah stok...">
+            </div>
+            <button class="btn-action" onclick="simpanStok()" style="width: 100%;">+ Simpan Stok</button>
+        </div>
+        <div class="card" style="overflow-x: auto;">
+            <table id="table-stok">
+                <thead>
+                    <tr>
+                        <th>Nama Bahan Baku</th>
+                        <th>Stok Tersedia</th>
+                        <th style="width:80px; text-align:center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN PENGELUARAN ================= -->
+    <main class="page" id="page-pengeluaran">
+        <h2 class="page-title">Pencatatan Pengeluaran</h2>
+        <div class="card">
+            <div class="form-group">
+                <label>Keterangan Pengeluaran</label>
+                <input type="text" id="p-ket" placeholder="Contoh: Belanja Kerupuk, Gas, Listrik...">
+            </div>
+            <div class="form-group">
+                <label>Nominal Pengeluaran (Rp)</label>
+                <input type="number" id="p-nominal" placeholder="Contoh: 50000">
+            </div>
+            <div class="form-group">
+                <label>Tanggal</label>
+                <input type="date" id="p-tgl">
+            </div>
+            <button class="btn-action" style="background:#e67e22; width:100%;" onclick="tambahPengeluaran()">+ Catat Pengeluaran</button>
+        </div>
+        <div class="card" style="overflow-x: auto;">
+            <table id="table-pengeluaran">
+                <thead>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Keterangan</th>
+                        <th>Nominal</th>
+                        <th style="width:70px; text-align:center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN LAPORAN DETAIL & PDF ================= -->
+    <main class="page" id="page-laporan">
+        <h2 class="page-title">Laporan Keuangan Detail</h2>
+        <div class="card">
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:8px;">Filter Rentang Tanggal:</label>
+            <div class="date-filter-grid">
+                <div>
+                    <label style="font-size:11px;">Dari:</label>
+                    <input type="date" id="filter-start" class="form-group" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;">Sampai:</label>
+                    <input type="date" id="filter-end" class="form-group" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <button class="btn-action" onclick="renderSemua()" style="margin-bottom: 2px;">Terapkan</button>
+            </div>
+            <button class="btn-selesai" style="width:100%; margin-top:15px; background:#c0392b;" onclick="exportPDF()">⬇️ Download Laporan PDF</button>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <div class="card" style="flex:1; text-align:center; padding:15px 5px; margin-bottom:0; background:#e8f8f5; border-left:4px solid #2ecc71;">
+                <span style="font-size:12px; color:#2c3e50;">Pemasukan</span>
+                <h3 id="lap-masuk" style="color:#27ae60; margin-top:5px;">Rp 0</h3>
+            </div>
+            <div class="card" style="flex:1; text-align:center; padding:15px 5px; margin-bottom:0; background:#fdedec; border-left:4px solid #e74c3c;">
+                <span style="font-size:12px; color:#2c3e50;">Pengeluaran</span>
+                <h3 id="lap-keluar" style="color:#c0392b; margin-top:5px;">Rp 0</h3>
+            </div>
+        </div>
+        <div class="card" style="text-align: center; background: #2c3e50; color: white;">
+            <h4 style="font-weight:normal;">Laba Bersih</h4>
+            <h1 id="lap-laba" style="margin-top: 5px; color:#f1c40f;">Rp 0</h1>
+        </div>
+
+        <div class="card" style="overflow-x: auto;">
+            <h4 style="margin-bottom: 10px; color: #2c3e50;">Riwayat Pemasukan (Selesai)</h4>
+            <table id="table-laporan-transaksi">
+                <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>Info Transaksi</th>
+                        <th>Nominal</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= HALAMAN TERJUAL ================= -->
+    <main class="page" id="page-terjual">
+        <h2 class="page-title">Menu & Bahan Terlaris</h2>
+        <div class="card" style="overflow-x: auto;">
+            <table id="table-terjual">
+                <thead>
+                    <tr>
+                        <th>Nama Item</th>
+                        <th>Kategori</th>
+                        <th>Qty Terjual</th>
+                        <th>Nominal Total</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- ================= KONEKSI FIREBASE ================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6QGcZMelyvGLx1PfcufB7Ah7PdD6TZ2o",
+            authDomain: "sistem-kedai.firebaseapp.com",
+            databaseURL: "https://sistem-kedai-default-rtdb.firebaseio.com",
+            projectId: "sistem-kedai",
+            storageBucket: "sistem-kedai.firebasestorage.app",
+            messagingSenderId: "508152587210",
+            appId: "1:508152587210:web:69df57942d42e91e72e533"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        window.firebaseDb = database;
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseOnValue = onValue;
+        
+        if(window.startApp) window.startApp();
+    </script>
+
+    <!-- ================= JAVASCRIPT LOGIKA UTAMA ================= -->
+    <script>
+        // --- STATE & DATABASE BROWSER ---
+        let db = { menus: [], stocks: [], orders: [], salesItems: [], expenses: [] };
+        let cartKasir = [];
+        let cartCust = [];
+        let currentKatKasir = 'biasa';
+        let currentKatCust = 'biasa';
+        let mejaAktif = 'Kasir';
+        
+        let porsiCounterKasir = 1;
+        let porsiCounterCust = 1;
+
+        let editModeIndex = -1; // State untuk fitur edit Master Menu
+
+        function initData() {
+            let todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-start').value = todayStr;
+            document.getElementById('filter-end').value = todayStr;
+            document.getElementById('p-tgl').value = todayStr;
+
+            // Memuat dari cache LocalStorage (Dukungan Offline yang sudah ada)
+            let saved = localStorage.getItem('kedaiDB_v8');
+            if (saved) {
+                db = JSON.parse(saved);
+                if(!db.expenses) db.expenses = [];
+                renderSemua();
+            } else {
+                // Default data jika kosong
+                db.menus = [
+                    { id: 1, nama: 'Mie Goreng Spesial', kategori: 'biasa', harga: 15000, img: '', recipe: [{nama: 'Indomie', qty: 1}, {nama: 'Telur', qty: 1}] },
+                    { id: 2, nama: 'Es Teh Manis', kategori: 'minuman', harga: 5000, img: '', recipe: [] }
+                ];
+                db.stocks = [
+                    {nama: 'Indomie', qty: 50},
+                    {nama: 'Telur', qty: 30}
+                ];
+                db.expenses = [];
+                saveDB();
+                renderSemua();
+            }
+
+            if (window.firebaseOnValue && window.firebaseRef) {
+                window.firebaseOnValue(window.firebaseRef(window.firebaseDb, 'kedaiDataV8/'), (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        db.menus = data.menus || [];
+                        db.stocks = data.stocks || [];
+                        db.orders = data.orders || [];
+                        db.salesItems = data.salesItems || [];
+                        db.expenses = data.expenses || [];
+                        
+                        // Timpa memori local saat Firebase berhasil merespon
+                        localStorage.setItem('kedaiDB_v8', JSON.stringify(db));
+                        renderSemua();
+                    }
+                });
+            }
+            checkAutoDetectMeja();
+        }
+
+        function checkAutoDetectMeja() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mejaParam = urlParams.get('meja');
+
+            if (mejaParam) {
+                mejaAktif = mejaParam;
+                document.getElementById('main-header').style.display = 'none';
+                document.getElementById('sidebar').style.display = 'none';
+                
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-customer').classList.add('active');
+                document.getElementById('cust-meja-title').innerText = "Pesan untuk: " + mejaAktif;
+                
+                const btnTutup = document.querySelector('.btn-tutup-simulasi');
+                if (btnTutup) btnTutup.style.display = 'none';
+
+                switchTab('biasa', 'customer');
+            }
+        }
+
+        function saveDB() { 
+            // Simpan ke local (Bisa berjalan Offline)
+            localStorage.setItem('kedaiDB_v8', JSON.stringify(db)); 
+            
+            // Simpan ke Firebase (Jika Online)
+            if (window.firebaseSet && window.firebaseRef && window.firebaseDb) {
+                window.firebaseSet(window.firebaseRef(window.firebaseDb, 'kedaiDataV8/'), db)
+                .catch(error => console.error("Firebase error (Mungkin Sedang Offline):", error));
+            }
+        }
+
+        function rp(angka) { return new Intl.NumberFormat('id-ID').format(angka); }
+        function getIcon(nama) {
+            let n = nama.toLowerCase();
+            if (n.includes('cireng') || n.includes('basreng') || n.includes('tahu') || n.includes('kentang')) return '🍿 ';
+            if (n.includes('sosis') || n.includes('keju') || n.includes('telur') || n.includes('sawi') || n.includes('bakso') || n.includes('ceker')) return '🥘 ';
+            if (n.includes('kerupuk')) return '🥗 ';
+            if (n.includes('es ') || n.includes('teh') || n.includes('jeruk') || n.includes('kopi')) return '🍹 ';
+            if (n.includes('nasi') || n.includes('mie') || n.includes('ayam')) return '🍱 ';
+            return '';
+        }
+
+        function toggleMenu() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
+        function nav(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+            
+            document.getElementById('page-' + pageId).classList.add('active');
+            event.target.classList.add('active');
+            document.getElementById('main-header').style.display = 'flex';
+            toggleMenu();
+            renderSemua();
+        }
+
+        // --- RENDER MENU & SEBLAK ---
+        function switchTab(kat, role) {
+            let containerId = 'menu-container-' + (role === 'kasir' ? 'kasir' : 'cust');
+            let builderId = 'seblak-builder-' + (role === 'kasir' ? 'kasir' : 'cust');
+            let container = document.getElementById(containerId);
+            let builder = document.getElementById(builderId);
+            let categories = ['biasa', 'seblak', 'cemilan', 'minuman'];
+
+            if (role === 'kasir') {
+                currentKatKasir = kat;
+                categories.forEach(k => { let btn = document.getElementById('tab-' + k); if(btn) btn.classList.remove('active'); });
+                document.getElementById('tab-' + kat).classList.add('active');
+            } else {
+                currentKatCust = kat;
+                categories.forEach(k => { let btn = document.getElementById('tab-' + k + '-cust'); if(btn) btn.classList.remove('active'); });
+                document.getElementById('tab-' + kat + '-cust').classList.add('active');
+            }
+
+            if (kat === 'seblak') {
+                container.style.display = 'none';
+                builder.style.display = 'block';
+                renderSeblakBuilder(role);
+            } else {
+                container.style.display = 'grid';
+                builder.style.display = 'none';
+                renderMenu(kat, containerId, role);
+            }
+        }
+
+        function renderMenu(kategori, containerId, role) {
+            let container = document.getElementById(containerId);
+            container.innerHTML = '';
+            let filtered = db.menus.filter(m => m.kategori === kategori);
+            
+            filtered.forEach(m => {
+                let isKosong = false;
+                let stokTeks = '';
+                
+                if (m.recipe && m.recipe.length > 0) {
+                    let minPorsi = 9999;
+                    m.recipe.forEach(r => {
+                        let stokBahan = db.stocks.find(s => s.nama === r.nama);
+                        let ketersediaan = stokBahan ? Math.floor(stokBahan.qty / r.qty) : 0;
+                        if(ketersediaan < minPorsi) minPorsi = ketersediaan;
+                    });
+                    if (minPorsi <= 0) isKosong = true;
+                    stokTeks = isKosong ? '<span style="color:red; font-size:11px;">BAHAN HABIS</span>' : `<span style="color:gray; font-size:11px;">Bisa: ${minPorsi} porsi</span>`;
+                } else {
+                    let stokItem = db.stocks.find(s => s.nama === m.nama);
+                    if (stokItem && stokItem.qty <= 0) isKosong = true;
+                    stokTeks = stokItem ? (isKosong ? '<span style="color:red; font-size:11px;">HABIS</span>' : `<span style="color:gray; font-size:11px;">Stok: ${stokItem.qty}</span>`) : '';
+                }
+
+                let opacity = isKosong ? '0.5' : '1';
+                let imgTag = m.img ? `<img src="${m.img}" alt="${m.nama}">` : `<div class="no-image">📷 No Img</div>`;
+
+                container.innerHTML += `
+                    <div class="menu-item" style="opacity: ${opacity}" onclick="if(!${isKosong}) addToCart('${m.nama}', ${m.harga}, '${m.kategori}', '${role}')">
+                        <div>${imgTag}<h4>${getIcon(m.nama)}${m.nama}</h4></div>
+                        <div><p>Rp ${rp(m.harga)}</p>${stokTeks}</div>
+                    </div>`;
+            });
+        }
+
+        function renderSeblakBuilder(role) {
+            let builderId = 'seblak-builder-' + (role === 'kasir' ? 'kasir' : 'cust');
+            let builder = document.getElementById(builderId);
+            let porsi = role === 'kasir' ? porsiCounterKasir : porsiCounterCust;
+            let seblakItems = db.menus.filter(m => m.kategori === 'seblak');
+            
+            let checklistHTML = seblakItems.map(m => {
+                let isKosong = false;
+                if (m.recipe && m.recipe.length > 0) {
+                    m.recipe.forEach(r => {
+                        let sb = db.stocks.find(s => s.nama === r.nama);
+                        if (!sb || sb.qty < r.qty) isKosong = true;
+                    });
+                } else {
+                    let stokItem = db.stocks.find(s => s.nama === m.nama);
+                    if (stokItem && stokItem.qty <= 0) isKosong = true;
+                }
+
+                return `
+                    <label class="check-item" style="opacity: ${isKosong ? '0.5' : '1'}">
+                        <input type="checkbox" value="${m.nama}" data-harga="${m.harga}" class="cb-seblak-${role}" ${isKosong ? 'disabled' : ''}>
+                        <div><span style="font-size:13px; font-weight:bold;">${getIcon(m.nama)}${m.nama}</span><br><span style="font-size:12px; color:#e74c3c;">Rp ${rp(m.harga)}</span>${isKosong ? '<br><span style="color:red; font-size:10px;">(HABIS)</span>' : ''}</div>
+                    </label>`;
+            }).join('');
+
+            builder.innerHTML = `
+                <div style="background:#fdf2e9; padding:10px; border-radius:6px; margin-bottom:15px; font-weight:bold; color:#d35400; border-left: 4px solid #e67e22;">
+                    🔥 Memilih Topping - Porsi Ke-${porsi}
+                </div>
+                <div class="builder-step"><h4>1. Pilih Topping</h4><div class="checklist-grid">${checklistHTML}</div></div>
+                <div class="builder-step">
+                    <h4>2. Level Pedas</h4>
+                    <div class="radio-group">
+                        <label class="radio-item"><input type="radio" name="pedas-${role}" value="Level: Tidak Pedas" checked> ⚪ Tidak Pedas</label>
+                        <label class="radio-item"><input type="radio" name="pedas-${role}" value="Level: Sedang"> 🌶️ Sedang</label>
+                        <label class="radio-item"><input type="radio" name="pedas-${role}" value="Level: Pedas"> 🔥 Pedas</label>
+                    </div>
+                </div>
+                <button class="btn-add-seblak" onclick="prosesSeblakBuilder('${role}')">+ Masukkan Porsi ${porsi}</button>`;
+        }
+
+        function prosesSeblakBuilder(role) {
+            let checkboxes = document.querySelectorAll(`.cb-seblak-${role}:checked`);
+            if (checkboxes.length === 0) return alert("Centang minimal 1 topping!");
+            let levelPedas = document.querySelector(`input[name="pedas-${role}"]:checked`).value;
+            let porsi = role === 'kasir' ? porsiCounterKasir : porsiCounterCust;
+            let catatanPorsi = `[Porsi ${porsi} - ${levelPedas}]`;
+
+            checkboxes.forEach(cb => addToCart(cb.value, parseInt(cb.getAttribute('data-harga')), 'seblak', role, catatanPorsi));
+            if (role === 'kasir') porsiCounterKasir++; else porsiCounterCust++;
+            renderSeblakBuilder(role);
+        }
+
+        // --- CART LOGIC ---
+        function addToCart(nama, harga, kategori, role, defaultNote = '') {
+            let targetCart = role === 'kasir' ? cartKasir : cartCust;
+            
+            let menuData = db.menus.find(m => m.nama === nama);
+            let totalQtyDiCart = targetCart.filter(c => c.nama === nama).reduce((sum, c) => sum + c.qty, 0) + 1;
+            
+            if (menuData && menuData.recipe && menuData.recipe.length > 0) {
+                for (let r of menuData.recipe) {
+                    let sb = db.stocks.find(s => s.nama === r.nama);
+                    if (!sb || (totalQtyDiCart * r.qty) > sb.qty) {
+                        return alert(`Bahan baku ${r.nama} tidak cukup untuk pesanan ini.`);
+                    }
+                }
+            } else {
+                let stokItem = db.stocks.find(s => s.nama === nama);
+                if (stokItem && totalQtyDiCart > stokItem.qty) return alert(`Stok ${nama} tidak cukup.`);
+            }
+
+            let itemDiCart = targetCart.find(c => c.nama === nama && c.note === defaultNote);
+            if (itemDiCart) itemDiCart.qty++;
+            else targetCart.push({ nama, harga, kategori, qty: 1, note: defaultNote });
+            renderCart(role);
+        }
+
+        function ubahQty(index, delta, role) {
+            let targetCart = role === 'kasir' ? cartKasir : cartCust;
+            let item = targetCart[index];
+            
+            if (delta > 0) {
+                let menuData = db.menus.find(m => m.nama === item.nama);
+                let totalQtyDiCart = targetCart.filter(c => c.nama === item.nama).reduce((sum, c) => sum + c.qty, 0) + 1;
+                
+                if (menuData && menuData.recipe && menuData.recipe.length > 0) {
+                    for (let r of menuData.recipe) {
+                        let sb = db.stocks.find(s => s.nama === r.nama);
+                        if (!sb || (totalQtyDiCart * r.qty) > sb.qty) return alert(`Bahan baku ${r.nama} tidak cukup.`);
+                    }
+                } else {
+                    let stokItem = db.stocks.find(s => s.nama === item.nama);
+                    if (stokItem && totalQtyDiCart > stokItem.qty) return alert(`Stok tidak cukup!`);
+                }
+            }
+            
+            item.qty += delta;
+            if (item.qty <= 0) targetCart.splice(index, 1);
+            renderCart(role);
+        }
+
+        function updateItemNote(index, val, role) {
+            (role === 'kasir' ? cartKasir : cartCust)[index].note = val;
+        }
+
+        function renderCart(role) {
+            let listId = role === 'kasir' ? 'cart-list-kasir' : 'cart-list-cust';
+            let priceId = role === 'kasir' ? 'total-price-kasir' : 'total-price-cust';
+            let targetCart = role === 'kasir' ? cartKasir : cartCust;
+            let list = document.getElementById(listId);
+            let total = 0; list.innerHTML = '';
+            
+            targetCart.forEach((c, i) => {
+                total += (c.harga * c.qty);
+                let bgStyle = (c.note && c.note.includes('[Porsi')) ? 'background: #f8f9fa; padding: 8px; border-radius: 4px; border: 1px solid #ecf0f1; margin-bottom: 5px;' : '';
+                list.innerHTML += `
+                    <div class="cart-item" style="${bgStyle}">
+                        <div class="cart-item-top">
+                            <div><b>${c.nama}</b><br><small style="color:gray;">Rp ${rp(c.harga)}</small></div>
+                            <div class="cart-controls"><button onclick="ubahQty(${i}, -1, '${role}')">-</button><span style="margin: 0 10px;">${c.qty}</span><button onclick="ubahQty(${i}, 1, '${role}')">+</button></div>
+                        </div>
+                        <input type="text" class="cart-note-input" placeholder="Catatan per item..." onchange="updateItemNote(${i}, this.value, '${role}')" value="${c.note || ''}">
+                    </div>`;
+            });
+            document.getElementById(priceId).innerText = `Rp ${rp(total)}`;
+        }
+
+        function formatRincianPesanan(cartData) {
+            let menuBiasa = [], seblakGroups = {}; 
+            cartData.forEach(c => {
+                if (c.kategori === 'seblak') {
+                    let porsiKey = (c.note && c.note.includes('[Porsi')) ? c.note.trim() : "Paket Topping";
+                    if (!seblakGroups[porsiKey]) seblakGroups[porsiKey] = [];
+                    seblakGroups[porsiKey].push(`${c.nama} (${c.qty}x)`);
+                } else {
+                    let itemText = `<b>${c.nama} (${c.qty}x)</b>`;
+                    if (c.note) itemText += `<br><span style="color:#e74c3c; font-size:11px;"><i>Note: ${c.note}</i></span>`;
+                    menuBiasa.push(itemText);
+                }
+            });
+
+            let rincianHTML = [];
+            for (let porsi in seblakGroups) {
+                rincianHTML.push(`<div style="background: #fdf2e9; padding: 5px; border-radius: 4px; border-left: 3px solid #e74c3c; margin-bottom: 5px;"><span style="color:#d35400; font-weight:bold; font-size:12px;">🍲 ${porsi}</span><br><span style="font-size:11px;">${seblakGroups[porsi].join(', ')}</span></div>`);
+            }
+            if (menuBiasa.length > 0) rincianHTML.push(menuBiasa.join('<br>'));
+            return rincianHTML.join('');
+        }
+
+        // --- SUBMIT ORDERS ---
+        function kirimPesananKeKasir() {
+            if (cartCust.length === 0) return alert("Pilih menu dulu!");
+            let total = cartCust.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            let rincian = formatRincianPesanan(cartCust);
+            let globalNote = document.getElementById('cust-note').value;
+            if(globalNote) rincian += `<br><div style="background:#fff3cd; padding:5px; font-size:11px;"><b>Note:</b> ${globalNote}</div>`;
+
+            let now = new Date();
+            db.orders.unshift({ 
+                id: Date.now(), isoDate: now.toISOString(), meja: mejaAktif, 
+                waktu: now.toLocaleString('id-ID'), total: total, rincian: rincian, 
+                status: 'pending', items: [...cartCust], sumber: 'QR Pelanggan' 
+            });
+            saveDB(); alert("✅ Pesanan terkirim ke dapur!");
+            cartCust = []; porsiCounterCust = 1; document.getElementById('cust-note').value = '';
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.get('meja')) tutupSimulasi(); else renderCart('customer');
+        }
+
+        function prosesTransaksi(sumberMeja) {
+            if (cartKasir.length === 0) return alert("Keranjang kosong!");
+            let total = cartKasir.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            let rincian = formatRincianPesanan(cartKasir);
+            
+            let paymentMethod = document.getElementById('kasir-payment').value;
+            let orderSource = document.getElementById('kasir-source').value;
+            let globalNote = document.getElementById('kasir-note').value;
+            
+            if(globalNote) rincian += `<br><div style="background:#e8f8f5; padding:5px; font-size:11px;"><b>Note:</b> ${globalNote}</div>`;
+
+            kurangiStok(cartKasir);
+            let now = new Date();
+            let newOrder = { 
+                id: Date.now(), isoDate: now.toISOString(), meja: 'Kasir Utama', 
+                waktu: now.toLocaleString('id-ID'), total: total, rincian: rincian, 
+                status: 'selesai', items: [...cartKasir], 
+                pembayaran: paymentMethod, sumber: orderSource 
+            };
+            
+            db.orders.unshift(newOrder);
+            saveDB(); 
+            
+            cetakStruk('dapur', 0); 
+            setTimeout(() => { cetakStruk('kasir', 0); }, 1500);
+
+            cartKasir = []; porsiCounterKasir = 1; document.getElementById('kasir-note').value = ''; renderSemua();
+        }
+
+        // --- MANAJEMEN STOK & KONDIMEN ---
+        function kurangiStok(itemsData) {
+            itemsData.forEach(c => {
+                let menuData = db.menus.find(m => m.nama === c.nama);
+                if (menuData && menuData.recipe && menuData.recipe.length > 0) {
+                    menuData.recipe.forEach(r => {
+                        let stokIdx = db.stocks.findIndex(s => s.nama === r.nama);
+                        if (stokIdx !== -1) db.stocks[stokIdx].qty -= (r.qty * c.qty);
+                    });
+                } else {
+                    let stokIdx = db.stocks.findIndex(s => s.nama === c.nama);
+                    if (stokIdx !== -1) db.stocks[stokIdx].qty -= c.qty;
+                }
+                
+                let terjual = db.salesItems.find(s => s.nama === c.nama);
+                if (terjual) terjual.qty += c.qty; 
+                else db.salesItems.push({ nama: c.nama, kategori: c.kategori, qty: c.qty });
+            });
+        }
+        
+        function kembalikanStok(itemsData) {
+            itemsData.forEach(c => {
+                let menuData = db.menus.find(m => m.nama === c.nama);
+                if (menuData && menuData.recipe && menuData.recipe.length > 0) {
+                    menuData.recipe.forEach(r => {
+                        let stokIdx = db.stocks.findIndex(s => s.nama === r.nama);
+                        if (stokIdx !== -1) db.stocks[stokIdx].qty += (r.qty * c.qty);
+                    });
+                } else {
+                    let stokIdx = db.stocks.findIndex(s => s.nama === c.nama);
+                    if (stokIdx !== -1) db.stocks[stokIdx].qty += c.qty;
+                }
+
+                let terjual = db.salesItems.find(s => s.nama === c.nama);
+                if (terjual) terjual.qty -= c.qty;
+            });
+        }
+
+        // --- MANAJEMEN ORDER MASUK ---
+        function renderOrders() {
+            let tbody = document.querySelector('#table-order tbody');
+            tbody.innerHTML = '';
+            let notifCount = 0;
+
+            db.orders.forEach((o, index) => {
+                if (o.status === 'batal') return;
+                
+                let isPending = o.status === 'pending';
+                if(isPending) notifCount++;
+                
+                let payInfo = o.pembayaran ? `<br><small style="color:#27ae60;">[${o.pembayaran} | ${o.sumber}]</small>` : '';
+
+                let btnAksi = '';
+                if(isPending) {
+                    btnAksi = `
+                        <button class="btn-print-dapur" onclick="cetakStruk('dapur', ${index})">🖨️ Cetak Dapur</button>
+                        <button class="btn-selesai" onclick="selesaikanOrder(${index})">✅ Selesai & Bayar</button>
+                        <button class="btn-batal" onclick="batalkanOrder(${index}, false)">❌ Batal</button>`;
+                } else {
+                    btnAksi = `
+                        <span class="badge-done">Selesai</span>
+                        <button class="btn-print" style="margin-top:5px;" onclick="cetakStruk('kasir', ${index})">🖨️ Struk Kasir</button>
+                        <button class="btn-batal" onclick="batalkanOrder(${index}, true)">Batalkan</button>`;
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${o.meja}</b><br><small style="color:gray;">${o.waktu}</small>${payInfo}</td>
+                        <td style="font-size:12px; line-height: 1.4;">${o.rincian}</td>
+                        <td><b>Rp ${rp(o.total)}</b></td>
+                        <td style="vertical-align:middle; text-align:center;">${btnAksi}</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('notif-order').style.display = notifCount > 0 ? 'inline-block' : 'none';
+        }
+
+        function selesaikanOrder(index) {
+            let metode = prompt("Metode Pembayaran? (Ketik: Tunai / QRIS / Transfer)", "Tunai");
+            if(metode) {
+                db.orders[index].status = 'selesai';
+                db.orders[index].pembayaran = metode;
+                if(!db.orders[index].sumber) db.orders[index].sumber = "Dine-in";
+                kurangiStok(db.orders[index].items);
+                saveDB(); renderSemua();
+                cetakStruk('kasir', index);
+            }
+        }
+
+        function batalkanOrder(index, isSudahSelesai) {
+            if(confirm("Yakin ingin membatalkan pesanan ini?")) {
+                db.orders[index].status = 'batal';
+                if (isSudahSelesai) kembalikanStok(db.orders[index].items);
+                saveDB(); renderSemua();
+            }
+        }
+
+        // --- SISTEM CETAK (DAPUR & KASIR) ---
+        function cetakStruk(tipe, index) {
+            let o = db.orders[index];
+            if (!o) return;
+
+            let printWindow = window.open('', '_blank', 'width=350,height=600');
+            let content = '';
+
+            if (tipe === 'dapur') {
+                content = `
+                    <div style="font-family: monospace; font-size:14px; width: 300px; margin: 0 auto; color:#000;">
+                        <h2 style="text-align:center; margin:0;">STRUK DAPUR / BAR</h2>
+                        <div style="text-align:center; font-size:12px; border-bottom: 2px dashed #000; padding-bottom:5px; margin-bottom:5px;">Simpan sebagai panduan persiapan</div>
+                        <b>Meja/Pemesan: ${o.meja}</b><br>
+                        Waktu: ${o.waktu.split(',')[1]}<br>
+                        <div style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;"></div>
+                        ${o.items.map(i => `
+                            <div style="margin-bottom:5px;">
+                                <b>- ${i.nama} (x${i.qty})</b>
+                                ${i.note ? `<br><span style="padding-left:10px; font-size:12px; font-style:italic;">Note: ${i.note}</span>` : ''}
+                            </div>
+                        `).join('')}
+                        <div style="border-top: 2px dashed #000; margin-top:10px;"></div>
+                    </div>
+                `;
+            } else if (tipe === 'kasir') {
+                content = `
+                    <div style="font-family: monospace; font-size:14px; width: 300px; margin: 0 auto; color:#000;">
+                        <h2 style="text-align:center; margin-bottom:0;">KEDAI KITA</h2>
+                        <div style="text-align:center; font-size:12px; margin-bottom:10px;">Jl. Raya No. 1, Kota Anda<br>Struk Pembayaran Sah</div>
+                        <div style="border-bottom: 1px dashed #000; margin-bottom:5px;"></div>
+                        Meja: ${o.meja}<br>
+                        Waktu: ${o.waktu}<br>
+                        Bayar: ${o.pembayaran || '-'}<br>
+                        <div style="border-bottom: 1px dashed #000; margin-bottom:5px; margin-top:5px;"></div>
+                        <table style="width:100%; font-size:13px; font-family: monospace;">
+                            ${o.items.map(i => `
+                                <tr><td colspan="2"><b>${i.nama}</b> ${i.note ? `<i>(${i.note})</i>` : ''}</td></tr>
+                                <tr>
+                                    <td>${i.qty} x ${rp(i.harga)}</td>
+                                    <td style="text-align:right;">${rp(i.qty * i.harga)}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                        <div style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;"></div>
+                        <h3 style="text-align:right; margin:0;">TOTAL: Rp ${rp(o.total)}</h3>
+                        <div style="border-top: 1px dashed #000; margin-top:5px; margin-bottom:10px;"></div>
+                        <div style="text-align:center; font-size:12px;">Terima kasih atas kunjungan Anda!<br>Follow IG: @kedaikita</div>
+                    </div>
+                `;
+            }
+
+            printWindow.document.write(`
+                <html><head><title>Print ${tipe.toUpperCase()}</title></head>
+                <body style="margin:0; padding:10px;">${content}</body></html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => { 
+                printWindow.print(); 
+                printWindow.close(); 
+            }, 500);
+        }
+
+        // --- MASTER MENU (EDIT & RESEP) ---
+        function tambahBarisResep(bahanVal = '', qtyVal = 1) {
+            let container = document.getElementById('resep-container');
+            let uniqueId = Date.now() + Math.floor(Math.random() * 1000);
+            
+            let options = db.stocks.map(s => `<option value="${s.nama}" ${s.nama === bahanVal ? 'selected' : ''}>${s.nama}</option>`).join('');
+            if(!options) options = `<option value="">-- Kosong (Isi Stok Dulu) --</option>`;
+
+            let rowHtml = `
+                <div class="resep-row" id="resrow-${uniqueId}" style="display:flex; gap:10px; margin-bottom:8px;">
+                    <select class="res-nama-input" style="flex:2; padding:8px; border-radius:4px; border:1px solid #ccc;">
+                        ${options}
+                    </select>
+                    <input type="number" class="res-qty-input" value="${qtyVal}" placeholder="Qty/Porsi" style="flex:1; padding:8px; border-radius:4px; border:1px solid #ccc;">
+                    <button class="btn-delete" onclick="document.getElementById('resrow-${uniqueId}').remove()" style="padding:8px 12px;">X</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        function simpanMenuData() {
+            let nama = document.getElementById('m-nama').value;
+            let kategori = document.getElementById('m-kategori').value;
+            let harga = parseInt(document.getElementById('m-harga').value);
+            let img = document.getElementById('m-img').value;
+
+            if(!nama || isNaN(harga)) return alert("Mohon isi Nama Menu dan Harga!");
+
+            let recipeData = [];
+            document.querySelectorAll('.resep-row').forEach(row => {
+                let rNama = row.querySelector('.res-nama-input').value;
+                let rQty = parseFloat(row.querySelector('.res-qty-input').value);
+                if (rNama && !isNaN(rQty) && rQty > 0) {
+                    recipeData.push({ nama: rNama, qty: rQty });
+                }
+            });
+
+            if (editModeIndex > -1) {
+                db.menus[editModeIndex].nama = nama;
+                db.menus[editModeIndex].kategori = kategori;
+                db.menus[editModeIndex].harga = harga;
+                db.menus[editModeIndex].img = img;
+                db.menus[editModeIndex].recipe = recipeData;
+                alert("Data menu berhasil diupdate!");
+            } else {
+                db.menus.push({ id: Date.now(), nama, kategori, harga, img, recipe: recipeData });
+                alert("Menu baru berhasil disimpan!");
+            }
+
+            batalEditMenu(); saveDB(); renderSemua();
+        }
+
+        function editMenu(index) {
+            let m = db.menus[index];
+            editModeIndex = index;
+            
+            document.getElementById('m-nama').value = m.nama;
+            document.getElementById('m-kategori').value = m.kategori;
+            document.getElementById('m-harga').value = m.harga;
+            document.getElementById('m-img').value = m.img || '';
+
+            document.getElementById('resep-container').innerHTML = '';
+            if (m.recipe && m.recipe.length > 0) {
+                m.recipe.forEach(r => tambahBarisResep(r.nama, r.qty));
+            }
+
+            document.getElementById('alert-edit').style.display = 'block';
+            document.getElementById('btn-simpan-menu').innerText = "🔄 Update Data Menu";
+            document.getElementById('btn-simpan-menu').style.background = "#f39c12";
+            document.getElementById('form-master-menu').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function batalEditMenu() {
+            editModeIndex = -1;
+            document.getElementById('m-nama').value = '';
+            document.getElementById('m-harga').value = '';
+            document.getElementById('m-img').value = '';
+            document.getElementById('resep-container').innerHTML = '';
+            document.getElementById('alert-edit').style.display = 'none';
+            document.getElementById('btn-simpan-menu').innerText = "+ Simpan Menu";
+            document.getElementById('btn-simpan-menu').style.background = "#2980b9";
+        }
+
+        function hapusMenu(index) { if (confirm("Yakin hapus menu ini?")) { db.menus.splice(index, 1); saveDB(); renderSemua(); } }
+        
+        function simpanStok() {
+            let nama = document.getElementById('s-nama-baru').value;
+            let qty = parseFloat(document.getElementById('s-qty').value);
+            
+            if(nama && !isNaN(qty)) { 
+                let e = db.stocks.find(s => s.nama.toLowerCase() === nama.toLowerCase()); 
+                if(e) e.qty += qty; else db.stocks.push({ nama, qty }); 
+                alert("Stok bahan baku disimpan!"); 
+                document.getElementById('s-nama-baru').value = ''; 
+                document.getElementById('s-qty').value = ''; 
+                saveDB(); renderSemua(); 
+            } else { alert("Masukkan nama dan jumlah valid."); }
+        }
+        function hapusStok(index) { if (confirm("Hapus data stok? Data resep menu yang menggunakan bahan ini mungkin akan error.")) { db.stocks.splice(index, 1); saveDB(); renderSemua(); } }
+
+        // --- PENGELUARAN ---
+        function tambahPengeluaran() {
+            let ket = document.getElementById('p-ket').value;
+            let nominal = parseInt(document.getElementById('p-nominal').value);
+            let tgl = document.getElementById('p-tgl').value;
+            
+            if(ket && nominal && tgl) {
+                db.expenses.push({ id: Date.now(), tanggal: tgl, ket, nominal });
+                saveDB(); renderSemua();
+                document.getElementById('p-ket').value = '';
+                document.getElementById('p-nominal').value = '';
+                alert("Pengeluaran dicatat!");
+            } else { alert("Lengkapi data pengeluaran!"); }
+        }
+        function hapusPengeluaran(index) {
+            if (confirm("Hapus catatan pengeluaran ini?")) { db.expenses.splice(index, 1); saveDB(); renderSemua(); }
+        }
+
+        // --- QR CODE ---
+        function generateQR() {
+            let meja = document.getElementById('qr-input-meja').value;
+            if(!meja) return alert("Masukkan nomor meja!");
+            mejaAktif = meja; document.getElementById('qr-meja-label').innerText = "Label: " + meja;
+            let baseUrl = window.location.origin + window.location.pathname;
+            let linkMenuOnline = `${baseUrl}?meja=${encodeURIComponent(meja)}`;
+            document.getElementById('qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(linkMenuOnline)}`;
+            document.getElementById('qr-result-box').style.display = 'block';
+        }
+        function bukaSimulasiPelanggan() {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-customer').classList.add('active');
+            document.getElementById('main-header').style.display = 'none'; 
+            document.getElementById('cust-meja-title').innerText = "Pesan untuk: " + mejaAktif;
+            switchTab('biasa', 'customer'); renderCart('customer');
+        }
+        function tutupSimulasi() { document.getElementById('main-header').style.display = 'flex'; nav('order'); }
+
+        // --- EKSPOR PDF ---
+        function exportPDF() {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                return alert("Pustaka pembuat PDF belum termuat, pastikan Anda terhubung ke internet.");
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            let startDate = document.getElementById('filter-start').value;
+            let endDate = document.getElementById('filter-end').value;
+            
+            doc.setFontSize(16); doc.text(`Laporan Keuangan Kedai`, 14, 15);
+            doc.setFontSize(11); doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 22);
+            
+            let orderData = db.orders.filter(o => o.status === 'selesai' && o.isoDate.split('T')[0] >= startDate && o.isoDate.split('T')[0] <= endDate).map(o => [o.waktu, `${o.meja} (${o.pembayaran||'-'})`, `Rp ${rp(o.total)}`]);
+            let totalPendapatan = db.orders.filter(o => o.status === 'selesai' && o.isoDate.split('T')[0] >= startDate && o.isoDate.split('T')[0] <= endDate).reduce((sum, o) => sum + o.total, 0);
+
+            doc.setFontSize(12); doc.text(`Tabel 1: Pemasukan / Pendapatan`, 14, 32);
+            doc.autoTable({
+                startY: 35, head: [['Waktu Transaksi', 'Info Transaksi', 'Nominal Pendapatan']],
+                body: orderData.length ? orderData : [['-', 'Tidak ada data pendapatan', '-']],
+                theme: 'striped', headStyles: { fillColor: [39, 174, 96] }
+            });
+
+            let expenseData = db.expenses.filter(e => e.tanggal >= startDate && e.tanggal <= endDate).map(e => [e.tanggal, e.ket, `Rp ${rp(e.nominal)}`]);
+            let totalPengeluaran = db.expenses.filter(e => e.tanggal >= startDate && e.tanggal <= endDate).reduce((sum, e) => sum + e.nominal, 0);
+
+            let finalY = doc.lastAutoTable.finalY || 35;
+            
+            doc.setFontSize(12); doc.text(`Tabel 2: Pengeluaran Operasional`, 14, finalY + 10);
+            doc.autoTable({
+                startY: finalY + 13, head: [['Tanggal Pengeluaran', 'Keterangan Barang/Jasa', 'Nominal Pengeluaran']],
+                body: expenseData.length ? expenseData : [['-', 'Tidak ada data pengeluaran', '-']],
+                theme: 'striped', headStyles: { fillColor: [231, 76, 60] }
+            });
+
+            finalY = doc.lastAutoTable.finalY || finalY + 13;
+            let laba = totalPendapatan - totalPengeluaran;
+            
+            doc.setFontSize(12); doc.text(`Ringkasan Keuangan:`, 14, finalY + 10);
+            doc.setFontSize(11);
+            doc.text(`Total Pemasukan: Rp ${rp(totalPendapatan)}`, 14, finalY + 18);
+            doc.text(`Total Pengeluaran: Rp ${rp(totalPengeluaran)}`, 14, finalY + 25);
+            doc.setFontSize(13); doc.text(`LABA BERSIH: Rp ${rp(laba)}`, 14, finalY + 35);
+
+            doc.save(`Laporan_Kedai_${startDate}_sd_${endDate}.pdf`);
+        }
+
+        // --- RENDER SEMUA ---
+        function renderLainnya() {
+            // Master Menu
+            let tMenu = document.querySelector('#table-menu tbody'); tMenu.innerHTML = ''; 
+            db.menus.forEach((m, index) => {
+                let imgThumb = m.img ? `<img src="${m.img}" style="width:45px; height:45px; object-fit:cover; border-radius:4px;">` : `<div style="width:45px; height:45px; background:#ecf0f1; text-align:center; line-height:45px; font-size:9px; border-radius:4px; color:#7f8c8d;">No Img</div>`;
+                let recipeHtml = `<span style="font-size:11px; color:#7f8c8d;">Tanpa Resep Khusus</span>`;
+                if(m.recipe && m.recipe.length > 0) recipeHtml = `<ul style="font-size:11px; padding-left:15px; margin:0; color:#e67e22;">${m.recipe.map(r => `<li>${r.nama} (${r.qty})</li>`).join('')}</ul>`;
+
+                tMenu.innerHTML += `
+                    <tr>
+                        <td>${imgThumb}</td>
+                        <td><b>${getIcon(m.nama)}${m.nama}</b></td>
+                        <td>${m.kategori}</td>
+                        <td><b>Rp ${rp(m.harga)}</b><br>${recipeHtml}</td>
+                        <td style="text-align:center;">
+                            <button class="btn-edit" onclick="editMenu(${index})">Edit</button>
+                            <button class="btn-delete" onclick="hapusMenu(${index})">Hapus</button>
+                        </td>
+                    </tr>`;
+            });
+
+            // Master Stok
+            let tStok = document.querySelector('#table-stok tbody'); tStok.innerHTML = '';
+            db.stocks.forEach((s, index) => { tStok.innerHTML += `<tr><td><b>${getIcon(s.nama)}${s.nama}</b></td><td>${s.qty}</td><td style="text-align:center;"><button class="btn-delete" onclick="hapusStok(${index})">Hapus</button></td></tr>`; });
+
+            // Laporan Filter Date Range
+            let startDate = document.getElementById('filter-start').value;
+            let endDate = document.getElementById('filter-end').value;
+
+            let orderSelesai = db.orders.filter(o => {
+                if (o.status !== 'selesai') return false;
+                let iso = o.isoDate ? o.isoDate.split('T')[0] : '';
+                return iso >= startDate && iso <= endDate;
+            });
+            let pendapatanTotal = orderSelesai.reduce((sum, o) => sum + o.total, 0);
+
+            let expensesFiltered = db.expenses.filter(e => e.tanggal >= startDate && e.tanggal <= endDate);
+            let pengeluaranTotal = expensesFiltered.reduce((sum, e) => sum + e.nominal, 0);
+
+            document.getElementById('lap-masuk').innerText = `Rp ${rp(pendapatanTotal)}`;
+            document.getElementById('lap-keluar').innerText = `Rp ${rp(pengeluaranTotal)}`;
+            document.getElementById('lap-laba').innerText = `Rp ${rp(pendapatanTotal - pengeluaranTotal)}`;
+
+            let tLaporanTrx = document.querySelector('#table-laporan-transaksi tbody'); tLaporanTrx.innerHTML = '';
+            orderSelesai.forEach(o => { 
+                tLaporanTrx.innerHTML += `<tr><td style="font-size:12px;">${o.waktu}</td><td><b>${o.meja}</b><br><small style="color:#27ae60;">[${o.pembayaran || '-'}]</small></td><td>Rp ${rp(o.total)}</td></tr>`; 
+            });
+
+            let tPengeluaran = document.querySelector('#table-pengeluaran tbody'); tPengeluaran.innerHTML = '';
+            db.expenses.forEach((e, index) => {
+                tPengeluaran.innerHTML += `<tr><td>${e.tanggal}</td><td>${e.ket}</td><td>Rp ${rp(e.nominal)}</td><td style="text-align:center;"><button class="btn-delete" onclick="hapusPengeluaran(${index})">Hapus</button></td></tr>`;
+            });
+
+            let tTerjual = document.querySelector('#table-terjual tbody'); tTerjual.innerHTML = '';
+            db.salesItems.sort((a,b) => b.qty - a.qty).forEach(s => {
+                let refMenu = db.menus.find(m => m.nama === s.nama);
+                let hargaSatuan = refMenu ? refMenu.harga : 0;
+                tTerjual.innerHTML += `<tr><td>${s.nama}</td><td>${s.kategori}</td><td><b>${s.qty}</b></td><td>Rp ${rp(hargaSatuan * s.qty)}</td></tr>`;
+            });
+        }
+
+        function renderSemua() {
+            let kasirContainer = document.getElementById('menu-container-kasir');
+            let custContainer = document.getElementById('menu-container-cust');
+            
+            if(currentKatKasir !== 'seblak' && kasirContainer) renderMenu(currentKatKasir, 'menu-container-kasir', 'kasir');
+            if(currentKatCust !== 'seblak' && custContainer) renderMenu(currentKatCust, 'menu-container-cust', 'customer');
+            
+            renderOrders(); renderLainnya();
+        }
+
+        // ================= SERVICE WORKER REGISTRATION (OFFLINE MODE) ================= //
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker berhasil didaftarkan! Scope:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Pendaftaran Service Worker gagal:', error);
+                    });
+            });
+        }
+
+        window.startApp = function() { initData(); };
+        setTimeout(() => { if(!window.firebaseDb) { console.warn("Offline Mode Terdeteksi. Menggunakan Cache."); initData(); } }, 1500);
+
+    </script>
+</body>
+</html>
