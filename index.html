@@ -75,7 +75,7 @@
         .cart-item-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .cart-controls button { background: #bdc3c7; border: none; padding: 5px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 16px;}
         .cart-note-input { width: 100%; margin-top: 8px; padding: 6px 10px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 12px; background: #fdfefe; }
-        .btn-checkout { background: #e74c3c; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 10px; cursor: pointer;}
+        .btn-checkout { background: #e74c3c; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer;}
         .btn-order-customer { background: #27ae60; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 10px; cursor: pointer;}
 
         /* TABEL & FORM */
@@ -160,9 +160,10 @@
             </div>
             
             <div class="form-group">
-                <label>Sumber Order</label>
+                <label>Sumber Order & Info Meja</label>
                 <select id="kasir-source">
-                    <option value="Offline">Offline / Dine-in / Takeaway</option>
+                    <option value="Offline">Takeaway / Bawa Pulang</option>
+                    <option value="Dine-in">Dine-in / Makan di Tempat</option>
                     <option value="ShopeeFood">ShopeeFood</option>
                     <option value="GoFood">GoFood</option>
                     <option value="GrabFood">GrabFood</option>
@@ -170,14 +171,32 @@
             </div>
 
             <div class="form-group">
-                <label>Catatan Tambahan Transaksi</label>
-                <textarea id="kasir-note" rows="2" placeholder="Catatan untuk struk/dapur..."></textarea>
+                <label>Nomor Meja / Catatan Transaksi</label>
+                <textarea id="kasir-note" rows="2" placeholder="Contoh: Meja 04, atau catatan struk..."></textarea>
             </div>
 
+            <!-- Area Kalkulator Otomatis Kasir -->
             <div style="background: #fdf2e9; padding: 15px; border-radius: 6px; text-align: right; margin-top: 10px;">
-                Total Bayar: <h2 id="total-price-kasir" style="color: #d35400;">Rp 0</h2>
+                <span style="font-size:14px; font-weight:bold;">Total Tagihan:</span>
+                <h2 id="total-price-kasir" style="color: #d35400; margin-bottom:15px; font-size:28px;">Rp 0</h2>
+                
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:8px;">
+                    <label style="font-size:13px; font-weight:bold; color:#2c3e50;">Uang Diterima:</label>
+                    <input type="number" id="kasir-uang" oninput="hitungKembalian()" placeholder="0" style="padding:10px; border:1px solid #bdc3c7; border-radius:4px; width:160px; text-align:right; font-size:16px; font-weight:bold;">
+                </div>
+                
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px;">
+                    <span style="font-size:13px; font-weight:bold; color:#2c3e50;">Kembalian:</span>
+                    <h3 id="kasir-kembalian" style="color: #27ae60; margin:0;">Rp 0</h3>
+                </div>
             </div>
-            <button class="btn-checkout" onclick="prosesTransaksi('Kasir')">Proses Pembayaran & Cetak Kasir</button>
+
+            <div style="display:flex; gap:10px; margin-top:15px; flex-direction:column;">
+                <!-- Tombol Dine In (Cetak Dapur Dulu) -->
+                <button class="btn-print-dapur" style="padding:15px; font-size:14px; margin:0; border-radius:8px;" onclick="prosesTransaksi('pending')">📥 Simpan Order & Cetak Dapur (Dine-in)</button>
+                <!-- Tombol Lunas -->
+                <button class="btn-checkout" style="margin:0; border-radius:8px;" onclick="prosesTransaksi('lunas')">✅ Bayar Lunas & Cetak Struk Kasir</button>
+            </div>
         </div>
     </main>
 
@@ -773,6 +792,9 @@
                     </div>`;
             });
             document.getElementById(priceId).innerText = `Rp ${rp(total)}`;
+
+            // Jika peran kasir, panggil kalkulator kembalian
+            if (role === 'kasir') hitungKembalian();
         }
 
         function formatRincianPesanan(cartData) {
@@ -797,7 +819,30 @@
             return rincianHTML.join('');
         }
 
-        // --- SUBMIT ORDERS ---
+        // --- SUBMIT ORDERS & TRANSAKSI (DINE-IN/LUNAS) ---
+        function hitungKembalian() {
+            let total = cartKasir.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            let inputElement = document.getElementById('kasir-uang');
+            let uang = parseInt(inputElement.value) || 0;
+            let display = document.getElementById('kasir-kembalian');
+            
+            if (total === 0) {
+                display.innerText = "Rp 0";
+                display.style.color = "#27ae60";
+                return;
+            }
+
+            let kembalian = uang - total;
+            
+            if (kembalian < 0 && uang > 0) {
+                display.innerText = "Uang Kurang!";
+                display.style.color = "#c0392b";
+            } else {
+                display.innerText = `Rp ${rp(kembalian > 0 ? kembalian : 0)}`;
+                display.style.color = "#27ae60";
+            }
+        }
+
         function kirimPesananKeKasir() {
             if (cartCust.length === 0) return alert("Pilih menu dulu!");
             let total = cartCust.reduce((sum, item) => sum + (item.harga * item.qty), 0);
@@ -818,33 +863,53 @@
             if (!urlParams.get('meja')) tutupSimulasi(); else renderCart('customer');
         }
 
-        function prosesTransaksi(sumberMeja) {
+        function prosesTransaksi(jenisTransaksi) {
             if (cartKasir.length === 0) return alert("Keranjang kosong!");
             let total = cartKasir.reduce((sum, item) => sum + (item.harga * item.qty), 0);
             let rincian = formatRincianPesanan(cartKasir);
             
             let paymentMethod = document.getElementById('kasir-payment').value;
             let orderSource = document.getElementById('kasir-source').value;
-            let globalNote = document.getElementById('kasir-note').value;
+            let mejaCatatan = document.getElementById('kasir-note').value;
+            let uangDiterima = parseInt(document.getElementById('kasir-uang').value) || 0;
             
-            if(globalNote) rincian += `<br><div style="background:#e8f8f5; padding:5px; font-size:11px;"><b>Note:</b> ${globalNote}</div>`;
+            if(mejaCatatan) rincian += `<br><div style="background:#e8f8f5; padding:5px; font-size:11px;"><b>Note Meja:</b> ${mejaCatatan}</div>`;
 
-            kurangiStok(cartKasir);
             let now = new Date();
             let newOrder = { 
-                id: Date.now(), isoDate: now.toISOString(), meja: 'Kasir Utama', 
+                id: Date.now(), isoDate: now.toISOString(), meja: mejaCatatan ? mejaCatatan : 'Kasir Utama', 
                 waktu: now.toLocaleString('id-ID'), total: total, rincian: rincian, 
-                status: 'selesai', items: [...cartKasir], 
-                pembayaran: paymentMethod, sumber: orderSource 
+                pembayaran: paymentMethod, sumber: orderSource, items: [...cartKasir]
             };
-            
-            db.orders.unshift(newOrder);
-            saveDB(); 
-            
-            cetakStruk('dapur', 0); 
-            setTimeout(() => { cetakStruk('kasir', 0); }, 1500);
 
-            cartKasir = []; porsiCounterKasir = 1; document.getElementById('kasir-note').value = ''; renderSemua();
+            if (jenisTransaksi === 'lunas') {
+                if (paymentMethod === 'Tunai' && uangDiterima > 0 && uangDiterima < total) {
+                    return alert("Uang diterima kurang dari total tagihan!");
+                }
+                newOrder.status = 'selesai';
+                newOrder.uangDiterima = paymentMethod === 'Tunai' && uangDiterima > 0 ? uangDiterima : total;
+                kurangiStok(cartKasir);
+                db.orders.unshift(newOrder);
+                saveDB(); 
+                
+                cetakStruk('dapur', 0); 
+                setTimeout(() => { cetakStruk('kasir', 0); }, 1500);
+            } 
+            else if (jenisTransaksi === 'pending') {
+                newOrder.status = 'pending';
+                newOrder.sumber = orderSource === 'Dine-in' ? 'Dine-in (Order Awal)' : orderSource;
+                db.orders.unshift(newOrder);
+                saveDB();
+                
+                cetakStruk('dapur', 0);
+                alert("Order disimpan & diteruskan ke Dapur!");
+            }
+
+            // Reset Form Kasir
+            cartKasir = []; porsiCounterKasir = 1; 
+            document.getElementById('kasir-note').value = ''; 
+            document.getElementById('kasir-uang').value = '';
+            renderSemua();
         }
 
         // --- MANAJEMEN STOK & KONDIMEN ---
@@ -903,7 +968,7 @@
                 if(isPending) {
                     btnAksi = `
                         <button class="btn-print-dapur" onclick="cetakStruk('dapur', ${index})">🖨️ Cetak Dapur</button>
-                        <button class="btn-selesai" onclick="selesaikanOrder(${index})">✅ Selesai & Bayar</button>
+                        <button class="btn-selesai" onclick="selesaikanOrder(${index})">✅ Lunas & Bayar</button>
                         <button class="btn-batal" onclick="batalkanOrder(${index}, false)">❌ Batal</button>`;
                 } else {
                     btnAksi = `
@@ -927,9 +992,25 @@
         function selesaikanOrder(index) {
             let metode = prompt("Metode Pembayaran? (Ketik: Tunai / QRIS / Transfer)", "Tunai");
             if(metode) {
+                let o = db.orders[index];
+                
+                if (metode.toLowerCase() === 'tunai') {
+                    let uang = prompt(`Total Tagihan: Rp ${rp(o.total)}\nMasukkan jumlah Uang Diterima:`, o.total);
+                    if (uang !== null) {
+                        let nominalUang = parseInt(uang) || o.total;
+                        if (nominalUang < o.total) {
+                            alert("Pembayaran Gagal: Uang diterima kurang dari total tagihan!");
+                            return;
+                        }
+                        o.uangDiterima = nominalUang;
+                    } else {
+                        return; // Dibatalkan pengguna
+                    }
+                }
+
                 db.orders[index].status = 'selesai';
                 db.orders[index].pembayaran = metode;
-                if(!db.orders[index].sumber) db.orders[index].sumber = "Dine-in";
+                if(db.orders[index].sumber.includes('Dine-in')) db.orders[index].sumber = "Dine-in (Lunas)";
                 kurangiStok(db.orders[index].items);
                 saveDB(); renderSemua();
                 cetakStruk('kasir', index);
@@ -959,6 +1040,7 @@
                         <div style="text-align:center; font-size:12px; border-bottom: 2px dashed #000; padding-bottom:5px; margin-bottom:5px;">Simpan sebagai panduan persiapan</div>
                         <b>Meja/Pemesan: ${o.meja}</b><br>
                         Waktu: ${o.waktu.split(',')[1]}<br>
+                        Status: ${o.status.toUpperCase()}<br>
                         <div style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;"></div>
                         ${o.items.map(i => `
                             <div style="margin-bottom:5px;">
@@ -970,6 +1052,12 @@
                     </div>
                 `;
             } else if (tipe === 'kasir') {
+                let infoKembalian = (o.pembayaran === 'Tunai' && o.uangDiterima) ? 
+                    `<div style="text-align:right; font-size:12px; margin-top:5px;">
+                        Tunai: Rp ${rp(o.uangDiterima)}<br>
+                        Kembali: Rp ${rp(o.uangDiterima - o.total)}
+                    </div>` : '';
+
                 content = `
                     <div style="font-family: monospace; font-size:14px; width: 300px; margin: 0 auto; color:#000;">
                         <h2 style="text-align:center; margin-bottom:0;">KEDAI KITA</h2>
@@ -990,6 +1078,7 @@
                         </table>
                         <div style="border-top: 1px dashed #000; margin-top:5px; padding-top:5px;"></div>
                         <h3 style="text-align:right; margin:0;">TOTAL: Rp ${rp(o.total)}</h3>
+                        ${infoKembalian}
                         <div style="border-top: 1px dashed #000; margin-top:5px; margin-bottom:10px;"></div>
                         <div style="text-align:center; font-size:12px;">Terima kasih atas kunjungan Anda!<br>Follow IG: @kedaikita</div>
                     </div>
