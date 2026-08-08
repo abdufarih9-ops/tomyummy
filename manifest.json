@@ -1,16 +1,25 @@
 {
-  "name": "Sistem Kedai & QR Menu",
-  "short_name": "KedaiApp",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#e74c3c",
+  "short_name": "KedaiApp V9",
+  "name": "KedaiApp V9 - Aplikasi Kasir",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3448/3448650.png",
-      "sizes": "512x512",
+      "src": "https://cdn-icons-png.flaticon.com/512/3144/3144456.png",
       "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3144/3144456.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": "./index.html",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "./",
+  "description": "Aplikasi Kasir POS KedaiApp V9 dengan dukungan Offline Mode."
 }
