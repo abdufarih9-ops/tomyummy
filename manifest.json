@@ -1,25 +1,29 @@
 {
-  "short_name": "KedaiApp V9",
-  "name": "KedaiApp V9 - Aplikasi Kasir",
+  "short_name": "KedaiApp",
+  "name": "KedaiApp Pro V9 - Sistem Kasir & Manajemen Kedai",
+  "description": "Sistem Kasir POS, Manajemen Stok, Pengeluaran & Laporan Keuangan Kedai",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3144/3144456.png",
+      "src": "/icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3144/3144456.png",
+      "src": "/icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "./index.html",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "start_url": "/index.html",
+  "background_color": "#2c3e50",
+  "theme_color": "#2c3e50",
   "display": "standalone",
-  "orientation": "portrait",
-  "scope": "./",
-  "description": "Aplikasi Kasir POS KedaiApp V9 dengan dukungan Offline Mode."
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "id-ID",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
+  "prefer_related_applications": false
 }
