@@ -1,81 +1,122 @@
-/* ========================================================================
-   KedaiApp V9 - Service Worker Script (Offline-First Cache)
-   ======================================================================== */
+/* ============================================================
+ * Service Worker - KedaiApp Pro V9
+ * ============================================================ */
 
-const CACHE_NAME = 'kedaiapp-v9-cache-v1';
+// ⚠️ BILA MENGUBAH KODE DI GITHUB, CUKUP UBAH NAMA VERSI DI BAWAH INI
+const CACHE_NAME = 'kedaiapp-v9.0.2';
 
-// Daftar aset internal dan CDN eksternal yang di-cache agar dapat berjalan offline
+// Daftar file inti (App Shell) yang wajib disimpan untuk akses offline
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  
-  // External Libraries (CDN)
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js',
-  'https://unpkg.com/dexie/dist/dexie.js',
-  'https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js',
-  'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js'
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
-/* 1. Event Install: Membuka cache dan menyimpan semua aset dasar */
+/* ------------------------------------------------------------
+ * 1. INSTALL EVENT
+ * Mengunduh aset penting dan langsung memaksakan SW baru aktif
+ * ------------------------------------------------------------ */
 self.addEventListener('install', (event) => {
+  console.log('[SW KedaiApp] Event Install: Memasang versi baru...', CACHE_NAME);
+  
+  // Memaksa Service Worker baru langsung mengambil alih tanpa menunggu browser ditutup
+  self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching app shell & dependencies');
+      console.log('[SW KedaiApp] Caching App Shell...');
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
-/* 2. Event Activate: Membersihkan cache versi lama jika ada pembaruan */
+/* ------------------------------------------------------------
+ * 2. ACTIVATE EVENT
+ * Membersihkan cache lama agar tampilan langsung terbarui
+ * ------------------------------------------------------------ */
 self.addEventListener('activate', (event) => {
+  console.log('[SW KedaiApp] Event Activate: Membersihkan cache lama...');
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
+          // Jika nama cache tidak sama dengan versi terbaru, hapus!
           if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Clearing old cache:', cache);
+            console.log('[SW KedaiApp] Hapus cache usang:', cache);
             return caches.delete(cache);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      // Mengambil alih semua tab browser yang sedang terbuka
+      return self.clients.claim();
+    })
   );
 });
 
-/* 3. Event Fetch: Strategi Cache-First dengan Network Fallback */
+/* ------------------------------------------------------------
+ * 3. FETCH EVENT
+ * Strategi:
+ * - HTML / Halaman Utama: Network First (Ambil web terbaru dulu, jika offline baru ambil cache)
+ * - File Statis Lainnya: Stale-While-Revalidate
+ * ------------------------------------------------------------ */
 self.addEventListener('fetch', (event) => {
-  // Hanya menangani request ber-protokol HTTP/HTTPS
-  if (!event.request.url.startsWith('http')) return;
+  // Abaikan request non-GET (seperti POST data transaksi ke server)
+  if (event.request.method !== 'GET') return;
 
+  const requestUrl = new URL(event.request.url);
+
+  // A. STRATEGI HALAMAN HTML (Mencegah masalah tampilan tidak berubah saat update GitHub)
+  if (event.request.headers.get('accept')?.includes('text/html') || requestUrl.pathname === '/') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          // Jika berhasil dapat data terbaru dari internet, perbarui cache
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Jika offline atau jaringan terputus, gunakan file dari cache
+          console.log('[SW KedaiApp] Mode Offline: Mengambil dari cache');
+          return caches.match(event.request) || caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // B. STRATEGI ASSET LAIN (CSS, JS, Gambar, Font)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Jika resource ditemukan di cache, gunakan data cache
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      // Jika tidak ada di cache, lakukan request ke jaringan
-      return fetch(event.request).then((networkResponse) => {
-        // Validasi respon yang diterima
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors') {
+      // Ambil dari cache dulu agar cepat
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
           return networkResponse;
-        }
+        })
+        .catch(() => {/* Abaikan error jaringan untuk asset non-HTML saat offline */});
 
-        // Duplikasi respon karena stream hanya bisa dibaca sekali
-        const responseToCache = networkResponse.clone();
-
-        // Simpan hasil fetch baru ke dalam cache untuk penggunaan berikutnya
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      }).catch(() => {
-        // Fallback jika jaringan terputus dan resource belum ada di cache
-        console.warn('[Service Worker] Fetch failed; returning offline status.');
-      });
+      return cachedResponse || fetchPromise;
     })
   );
+});
+
+/* ------------------------------------------------------------
+ * 4. MESSAGE EVENT
+ * Mendengarkan perintah refresh dari script utama index.html
+ * ------------------------------------------------------------ */
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
