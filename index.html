@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -294,6 +295,13 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             font-size: 12px;
             color: #000;
+        }
+
+        /* PRINT MEDIA AREA */
+        @media print {
+            body * { visibility: hidden; }
+            #printable-area, #printable-area * { visibility: visible; }
+            #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
         }
     </style>
 </head>
@@ -868,6 +876,9 @@
         </div>
     </main>
 
+    <!-- WADAH PRINT SEMENTARA -->
+    <div id="printable-area"></div>
+
     <!-- ================= KONEKSI FIREBASE CLOUD FIRESTORE ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
@@ -934,9 +945,9 @@
 
         async function initData() {
             let todayStr = new Date().toISOString().split('T')[0];
-            document.getElementById('filter-start').value = todayStr;
-            document.getElementById('filter-end').value = todayStr;
-            document.getElementById('p-tgl').value = todayStr;
+            if (document.getElementById('filter-start')) document.getElementById('filter-start').value = todayStr;
+            if (document.getElementById('filter-end')) document.getElementById('filter-end').value = todayStr;
+            if (document.getElementById('p-tgl')) document.getElementById('p-tgl').value = todayStr;
 
             if (document.getElementById('filter-p-start')) document.getElementById('filter-p-start').value = todayStr;
             if (document.getElementById('filter-p-end')) document.getElementById('filter-p-end').value = todayStr;
@@ -1045,6 +1056,8 @@
             renderPengeluaran();
             renderLaporan();
             renderTerjual();
+            renderMasterMenu();
+            renderStok();
             renderAudit();
             updateStrukPreview();
             switchTab(currentKatKasir, 'kasir');
@@ -1110,11 +1123,11 @@
             if (role === 'kasir') {
                 currentKatKasir = kat;
                 categories.forEach(k => { let btn = document.getElementById('tab-' + k); if(btn) btn.classList.remove('active'); });
-                document.getElementById('tab-' + kat).classList.add('active');
+                if (document.getElementById('tab-' + kat)) document.getElementById('tab-' + kat).classList.add('active');
             } else {
                 currentKatCust = kat;
                 categories.forEach(k => { let btn = document.getElementById('tab-' + k + '-cust'); if(btn) btn.classList.remove('active'); });
-                document.getElementById('tab-' + kat + '-cust').classList.add('active');
+                if (document.getElementById('tab-' + kat + '-cust')) document.getElementById('tab-' + kat + '-cust').classList.add('active');
             }
 
             if (kat === 'seblak') {
@@ -1126,6 +1139,7 @@
 
         function renderMenu(kategori, containerId, role) {
             let container = document.getElementById(containerId);
+            if(!container) return;
             container.innerHTML = '';
             let filtered = db.products.filter(m => m.category === kategori);
             
@@ -1155,6 +1169,7 @@
         function renderSeblakBuilder(role) {
             let builderId = 'seblak-builder-' + (role === 'kasir' ? 'kasir' : 'cust');
             let builder = document.getElementById(builderId);
+            if (!builder) return;
             let porsi = role === 'kasir' ? porsiCounterKasir : porsiCounterCust;
             let seblakItems = db.products.filter(m => m.category === 'seblak');
             
@@ -1273,6 +1288,7 @@
             let priceId = role === 'kasir' ? 'total-price-kasir' : 'total-price-cust';
             let targetCart = role === 'kasir' ? cartKasir : cartCust;
             let list = document.getElementById(listId);
+            if (!list) return;
             let subtotal = 0; list.innerHTML = '';
             
             targetCart.forEach((c, i) => {
@@ -1295,20 +1311,20 @@
             let grandTotal = subtotal + serviceVal + pajakVal;
 
             if (role === 'kasir') {
-                document.getElementById('subtotal-kasir').innerText = `Rp ${rp(subtotal)}`;
-                document.getElementById('txt-service-pct').innerText = servicePct;
-                document.getElementById('service-kasir').innerText = `Rp ${rp(serviceVal)}`;
-                document.getElementById('txt-pajak-pct').innerText = pajakPct;
-                document.getElementById('pajak-kasir').innerText = `Rp ${rp(pajakVal)}`;
-                document.getElementById(priceId).innerText = `Rp ${rp(grandTotal)}`;
+                if (document.getElementById('subtotal-kasir')) document.getElementById('subtotal-kasir').innerText = `Rp ${rp(subtotal)}`;
+                if (document.getElementById('txt-service-pct')) document.getElementById('txt-service-pct').innerText = servicePct;
+                if (document.getElementById('service-kasir')) document.getElementById('service-kasir').innerText = `Rp ${rp(serviceVal)}`;
+                if (document.getElementById('txt-pajak-pct')) document.getElementById('txt-pajak-pct').innerText = pajakPct;
+                if (document.getElementById('pajak-kasir')) document.getElementById('pajak-kasir').innerText = `Rp ${rp(pajakVal)}`;
+                if (document.getElementById(priceId)) document.getElementById(priceId).innerText = `Rp ${rp(grandTotal)}`;
                 hitungKembalian();
             } else {
-                document.getElementById('subtotal-cust').innerText = `Rp ${rp(subtotal)}`;
-                document.getElementById('txt-service-pct-cust').innerText = servicePct;
-                document.getElementById('service-cust').innerText = `Rp ${rp(serviceVal)}`;
-                document.getElementById('txt-pajak-pct-cust').innerText = pajakPct;
-                document.getElementById('pajak-cust').innerText = `Rp ${rp(pajakVal)}`;
-                document.getElementById(priceId).innerText = `Rp ${rp(grandTotal)}`;
+                if (document.getElementById('subtotal-cust')) document.getElementById('subtotal-cust').innerText = `Rp ${rp(subtotal)}`;
+                if (document.getElementById('txt-service-pct-cust')) document.getElementById('txt-service-pct-cust').innerText = servicePct;
+                if (document.getElementById('service-cust')) document.getElementById('service-cust').innerText = `Rp ${rp(serviceVal)}`;
+                if (document.getElementById('txt-pajak-pct-cust')) document.getElementById('txt-pajak-pct-cust').innerText = pajakPct;
+                if (document.getElementById('pajak-cust')) document.getElementById('pajak-cust').innerText = `Rp ${rp(pajakVal)}`;
+                if (document.getElementById(priceId)) document.getElementById(priceId).innerText = `Rp ${rp(grandTotal)}`;
             }
         }
 
@@ -1343,19 +1359,22 @@
             let total = subtotal + serviceVal + pajakVal;
 
             let inputElement = document.getElementById('kasir-uang');
+            if(!inputElement) return;
             let uang = parseInt(inputElement.value) || 0;
             let display = document.getElementById('kasir-kembalian');
             
             if (total === 0) {
-                display.innerText = "Rp 0"; display.style.color = "#10b981"; return;
+                if(display) { display.innerText = "Rp 0"; display.style.color = "#10b981"; }
+                return;
             }
 
             let kembalian = uang - total;
-            
-            if (kembalian < 0 && uang > 0) {
-                display.innerText = "Uang Kurang!"; display.style.color = "#ef4444";
-            } else {
-                display.innerText = `Rp ${rp(kembalian > 0 ? kembalian : 0)}`; display.style.color = "#10b981";
+            if(display) {
+                if (kembalian < 0 && uang > 0) {
+                    display.innerText = "Uang Kurang!"; display.style.color = "#ef4444";
+                } else {
+                    display.innerText = `Rp ${rp(kembalian > 0 ? kembalian : 0)}`; display.style.color = "#10b981";
+                }
             }
         }
 
@@ -1496,6 +1515,7 @@
 
         function renderOrders() {
             let tbody = document.querySelector('#table-order tbody');
+            if (!tbody) return;
             tbody.innerHTML = '';
             let notifCount = 0;
 
@@ -1529,7 +1549,8 @@
                     </tr>
                 `;
             });
-            document.getElementById('notif-order').style.display = notifCount > 0 ? 'inline-block' : 'none';
+            let notifEl = document.getElementById('notif-order');
+            if(notifEl) notifEl.style.display = notifCount > 0 ? 'inline-block' : 'none';
         }
 
         async function selesaikanOrder(index) {
@@ -1611,15 +1632,15 @@
         }
 
         function populateSettingForm() {
-            document.getElementById('setting-nama-toko').value = getSettingValue('namaToko', 'KEDAI KITA PRO');
-            document.getElementById('setting-alamat-toko').value = getSettingValue('alamatToko', 'Pusat Kota');
-            document.getElementById('setting-nohp-toko').value = getSettingValue('noHpToko', '0812-3456-7890');
-            document.getElementById('setting-ig-toko').value = getSettingValue('igToko', '@kedaikitapro');
-            document.getElementById('setting-header-note').value = getSettingValue('headerNote', 'WiFi: kedai123');
-            document.getElementById('setting-footer-note').value = getSettingValue('footerNote', 'Terima kasih atas kunjungannya!');
-            document.getElementById('setting-pajak-pct').value = getSettingValue('pajakPct', '0');
-            document.getElementById('setting-service-pct').value = getSettingValue('servicePct', '0');
-            document.getElementById('setting-printer-width').value = getSettingValue('printerWidth', '58');
+            if (document.getElementById('setting-nama-toko')) document.getElementById('setting-nama-toko').value = getSettingValue('namaToko', 'KEDAI KITA PRO');
+            if (document.getElementById('setting-alamat-toko')) document.getElementById('setting-alamat-toko').value = getSettingValue('alamatToko', 'Pusat Kota');
+            if (document.getElementById('setting-nohp-toko')) document.getElementById('setting-nohp-toko').value = getSettingValue('noHpToko', '0812-3456-7890');
+            if (document.getElementById('setting-ig-toko')) document.getElementById('setting-ig-toko').value = getSettingValue('igToko', '@kedaikitapro');
+            if (document.getElementById('setting-header-note')) document.getElementById('setting-header-note').value = getSettingValue('headerNote', 'WiFi: kedai123');
+            if (document.getElementById('setting-footer-note')) document.getElementById('setting-footer-note').value = getSettingValue('footerNote', 'Terima kasih atas kunjungannya!');
+            if (document.getElementById('setting-pajak-pct')) document.getElementById('setting-pajak-pct').value = getSettingValue('pajakPct', '0');
+            if (document.getElementById('setting-service-pct')) document.getElementById('setting-service-pct').value = getSettingValue('servicePct', '0');
+            if (document.getElementById('setting-printer-width')) document.getElementById('setting-printer-width').value = getSettingValue('printerWidth', '58');
             updateStrukPreview();
         }
 
@@ -1627,14 +1648,14 @@
             let previewBox = document.getElementById('struk-live-preview');
             if(!previewBox) return;
 
-            let nama = document.getElementById('setting-nama-toko').value || 'NAMA OUTLET';
-            let alamat = document.getElementById('setting-alamat-toko').value || 'Alamat Kedai';
-            let noHp = document.getElementById('setting-nohp-toko').value || '08123456789';
-            let ig = document.getElementById('setting-ig-toko').value || '';
-            let headerNote = document.getElementById('setting-header-note').value || '';
-            let footerNote = document.getElementById('setting-footer-note').value || 'Terima kasih!';
-            let pajakPct = parseFloat(document.getElementById('setting-pajak-pct').value) || 0;
-            let servicePct = parseFloat(document.getElementById('setting-service-pct').value) || 0;
+            let nama = document.getElementById('setting-nama-toko')?.value || 'NAMA OUTLET';
+            let alamat = document.getElementById('setting-alamat-toko')?.value || 'Alamat Kedai';
+            let noHp = document.getElementById('setting-nohp-toko')?.value || '08123456789';
+            let ig = document.getElementById('setting-ig-toko')?.value || '';
+            let headerNote = document.getElementById('setting-header-note')?.value || '';
+            let footerNote = document.getElementById('setting-footer-note')?.value || 'Terima kasih!';
+            let pajakPct = parseFloat(document.getElementById('setting-pajak-pct')?.value) || 0;
+            let servicePct = parseFloat(document.getElementById('setting-service-pct')?.value) || 0;
 
             let subtotalDemo = 25000;
             let serviceDemo = Math.round(subtotalDemo * (servicePct / 100));
@@ -1695,133 +1716,482 @@
             updateSetting('igToko', ig);
             updateSetting('headerNote', headerNote);
             updateSetting('footerNote', footerNote);
-            updateSetting('pajakPct', pajakPct);
-            updateSetting('servicePct', servicePct);
-            updateSetting('printerWidth', printerWidth);
+            updateSetting('pajakPct', pajakPct || '0'); 
+            updateSetting('servicePct', servicePct || '0');
+            updateSetting('printerWidth', printerWidth || '58');
 
-            saveDB();
-            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Konfigurasi struk berhasil diperbarui.', timer: 1500, showConfirmButton: false });
+            recordAudit('UPDATE_SETTINGS', `Ubah profil toko: ${nama}`);
+            saveDB(); renderSemua();
+            Swal.fire({ icon: 'success', title: 'Berhasil Disimpan', text: 'Konfigurasi sistem & struk berhasil diperbarui.' });
         }
 
-        /* ================= FUNGSI CETAK STRUK KASIR & DAPUR ================= */
-        function cetakStruk(tipe, index) {
-            let order = db.orders[index];
-            if (!order) return Swal.fire({ icon: 'error', title: 'Error', text: 'Data transaksi tidak ditemukan.' });
-
-            let namaToko = getSettingValue('namaToko', 'KEDAI KITA PRO');
-            let alamatToko = getSettingValue('alamatToko', 'Pusat Kota');
-            let noHpToko = getSettingValue('noHpToko', '');
-            let headerNote = getSettingValue('headerNote', '');
-            let footerNote = getSettingValue('footerNote', 'Terima kasih atas kunjungannya!');
-            let printerWidth = getSettingValue('printerWidth', '58');
-
-            let printWin = window.open('', '_blank', 'width=400,height=600');
-            if (!printWin) return Swal.fire({ icon: 'warning', title: 'Pop-up Diblokir', text: 'Izinkan pop-up di browser Anda untuk mencetak struk.' });
-
-            let htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Cetak ${tipe === 'dapur' ? 'Tiket Dapur' : 'Struk Kasir'}</title>
-                <style>
-                    @page { margin: 0; }
-                    body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; width: ${printerWidth === '80' ? '300px' : '220px'}; color: #000; }
-                    .text-center { text-align: center; }
-                    .bold { font-weight: bold; }
-                    .line { border-bottom: 1px dashed #000; margin: 6px 0; }
-                    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-                    td { vertical-align: top; }
-                </style>
-            </head>
-            <body>
-            `;
-
-            if (tipe === 'dapur') {
-                htmlContent += `
-                    <div class="text-center bold" style="font-size:16px;">*** ORDER DAPUR ***</div>
-                    <div class="line"></div>
-                    <div><b>No:</b> ${order.order_number}</div>
-                    <div><b>Meja:</b> ${order.meja}</div>
-                    <div><b>Waktu:</b> ${order.waktu}</div>
-                    <div class="line"></div>
-                    <div style="font-size:12px; line-height:1.4;">${order.rincian}</div>
-                    <div class="line"></div>
-                `;
+        // ================= FUNGSI PENGELUARAN DENGAN FILTER HARI INI ================= //
+        function toggleFilterTanggalPengeluaran() {
+            let mode = document.getElementById('filter-p-periode').value;
+            let boxCustom = document.getElementById('box-filter-custom-p');
+            if (mode === 'CUSTOM') {
+                boxCustom.style.display = 'grid';
             } else {
-                let itemsHTML = '';
-                if (order.items && order.items.length > 0) {
-                    order.items.forEach(it => {
-                        itemsHTML += `
-                            <tr><td colspan="2" class="bold">${it.nama}</td></tr>
-                            <tr><td>${it.qty} x ${rp(it.harga)}</td><td style="text-align:right;">${rp(it.qty * it.harga)}</td></tr>
-                        `;
-                    });
-                } else {
-                    itemsHTML = `<tr><td colspan="2">${order.rincian}</td></tr>`;
+                boxCustom.style.display = 'none';
+            }
+            renderPengeluaran();
+        }
+
+        function renderPengeluaran() {
+            let tbody = document.querySelector('#table-pengeluaran tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            let katFilter = document.getElementById('filter-p-kategori')?.value || 'SEMUA';
+            let periodeMode = document.getElementById('filter-p-periode')?.value || 'TODAY';
+            let todayStr = new Date().toISOString().split('T')[0];
+            let currentMonthStr = todayStr.substring(0, 7);
+
+            let totalExp = 0;
+
+            let filtered = db.expenses.filter(p => {
+                if (katFilter !== 'SEMUA' && p.kategori !== katFilter) return false;
+
+                if (periodeMode === 'TODAY') {
+                    if (p.tanggal !== todayStr) return false;
+                } else if (periodeMode === 'THIS_MONTH') {
+                    if (!p.tanggal || !p.tanggal.startsWith(currentMonthStr)) return false;
+                } else if (periodeMode === 'CUSTOM') {
+                    let startDate = document.getElementById('filter-p-start').value;
+                    let endDate = document.getElementById('filter-p-end').value;
+                    if (startDate && p.tanggal < startDate) return false;
+                    if (endDate && p.tanggal > endDate) return false;
                 }
+                
+                return true;
+            });
 
-                let uangDiterima = order.uangDiterima || order.total;
-                let kembalian = uangDiterima - order.total;
-
-                htmlContent += `
-                    <div class="text-center bold" style="font-size:14px;">${namaToko}</div>
-                    <div class="text-center">${alamatToko}</div>
-                    ${noHpToko ? `<div class="text-center">Telp: ${noHpToko}</div>` : ''}
-                    ${headerNote ? `<div class="text-center"><i>${headerNote}</i></div>` : ''}
-                    <div class="line"></div>
-                    <div><b>No:</b> ${order.order_number}</div>
-                    <div><b>Meja:</b> ${order.meja}</div>
-                    <div><b>Waktu:</b> ${order.waktu}</div>
-                    <div><b>Kasir:</b> ${currentUser.name}</div>
-                    <div class="line"></div>
-                    <table>${itemsHTML}</table>
-                    <div class="line"></div>
-                    <table>
-                        <tr><td>Subtotal:</td><td style="text-align:right;">Rp ${rp(order.subtotal || order.total)}</td></tr>
-                        ${order.service ? `<tr><td>Service:</td><td style="text-align:right;">Rp ${rp(order.service)}</td></tr>` : ''}
-                        ${order.pajak ? `<tr><td>Pajak:</td><td style="text-align:right;">Rp ${rp(order.pajak)}</td></tr>` : ''}
-                        <tr class="bold"><td>TOTAL:</td><td style="text-align:right;">Rp ${rp(order.total)}</td></tr>
-                        ${order.pembayaran === 'Tunai' ? `
-                            <tr><td>Tunai:</td><td style="text-align:right;">Rp ${rp(uangDiterima)}</td></tr>
-                            <tr><td>Kembali:</td><td style="text-align:right;">Rp ${rp(kembalian > 0 ? kembalian : 0)}</td></tr>
-                        ` : `<tr><td>Bayar (${order.pembayaran}):</td><td style="text-align:right;">Rp ${rp(order.total)}</td></tr>`}
-                    </table>
-                    <div class="line"></div>
-                    <div class="text-center">${footerNote}</div>
+            filtered.forEach((p, index) => {
+                totalExp += p.nominal;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><small style="color:#64748b;">${p.tanggal || '-'}</small></td>
+                        <td><b style="color:#0f172a;">${p.keterangan}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600; color:#475569;">${p.kategori}</span><br><small style="color:#94a3b8;">${p.metode || 'Tunai'}</small></td>
+                        <td><b style="color:#dc2626;">Rp ${rp(p.nominal)}</b></td>
+                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusPengeluaran(${p.id})">Hapus</button></td>
+                    </tr>
                 `;
+            });
+
+            if (document.getElementById('txt-total-pengeluaran')) {
+                document.getElementById('txt-total-pengeluaran').innerText = `Rp ${rp(totalExp)}`;
+            }
+        }
+
+        async function tambahPengeluaran() {
+            let ket = document.getElementById('p-ket').value;
+            let kat = document.getElementById('p-kategori').value;
+            let metode = document.getElementById('p-metode').value;
+            let nom = parseInt(document.getElementById('p-nominal').value);
+            let tgl = document.getElementById('p-tgl').value;
+
+            if(!ket || !nom) return Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Keterangan dan nominal pengeluaran wajib diisi!' });
+
+            let newExp = { id: Date.now(), keterangan: ket, kategori: kat, metode: metode, nominal: nom, tanggal: tgl };
+            db.expenses.unshift(newExp);
+            
+            recordAudit('ADD_EXPENSE', `Pengeluaran ${kat}: ${ket} (Rp ${rp(nom)})`);
+            await saveDB();
+            renderSemua();
+
+            document.getElementById('p-ket').value = '';
+            document.getElementById('p-nominal').value = '';
+            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Pengeluaran berhasil dicatat.', timer: 1200, showConfirmButton: false });
+        }
+
+        async function hapusPengeluaran(id) {
+            let confirm = await Swal.fire({
+                title: 'Hapus Catatan?',
+                text: "Data pengeluaran ini akan dihapus permanen.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'Ya, Hapus'
+            });
+
+            if (confirm.isConfirmed) {
+                let idx = db.expenses.findIndex(p => p.id === id);
+                if (idx > -1) {
+                    recordAudit('DELETE_EXPENSE', `Hapus pengeluaran: ${db.expenses[idx].keterangan}`);
+                    db.expenses.splice(idx, 1);
+                    await saveDB();
+                    renderSemua();
+                    Swal.fire({ icon: 'success', title: 'Terhapus', text: 'Data berhasil dihapus.', timer: 1000, showConfirmButton: false });
+                }
+            }
+        }
+
+        // ================= LAPORAN KEUANGAN & SISA LOGIKA ================= //
+        function renderLaporan() {
+            let startDate = document.getElementById('filter-start')?.value;
+            let endDate = document.getElementById('filter-end')?.value;
+
+            let omsetTunai = 0, omsetOnline = 0, totalHpp = 0;
+            let tbody = document.querySelector('#table-laporan-transaksi tbody');
+            if(tbody) tbody.innerHTML = '';
+
+            let successOrders = db.orders.filter(o => o.status === 'selesai');
+
+            if (startDate || endDate) {
+                successOrders = successOrders.filter(o => {
+                    let d = o.isoDate ? o.isoDate.split('T')[0] : '';
+                    if (startDate && d < startDate) return false;
+                    if (endDate && d > endDate) return false;
+                    return true;
+                });
             }
 
-            htmlContent += `
-                <script>
-                    window.onload = function() { window.print(); window.close(); }
-                <\/script>
-            </body>
-            </html>
+            successOrders.forEach(o => {
+                if (o.pembayaran === 'Tunai') omsetTunai += o.total;
+                else omsetOnline += o.total;
+
+                totalHpp += (o.total_cogs || 0);
+
+                if (tbody) {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><small style="color:#64748b;">${o.waktu}</small></td>
+                            <td><b>${o.meja}</b> (${o.pembayaran || 'Tunai'})<br><span style="font-size:11px; color:#475569;">${o.rincian}</span></td>
+                            <td><b style="color:#10b981;">Rp ${rp(o.total)}</b></td>
+                        </tr>
+                    `;
+                }
+            });
+
+            let totalOmset = omsetTunai + omsetOnline;
+            
+            let totalPengeluaran = db.expenses.reduce((sum, p) => {
+                if (startDate || endDate) {
+                    if (startDate && p.tanggal < startDate) return sum;
+                    if (endDate && p.tanggal > endDate) return sum;
+                }
+                return sum + p.nominal;
+            }, 0);
+
+            let labaBersih = totalOmset - totalHpp - totalPengeluaran;
+
+            if (document.getElementById('lap-masuk-tunai')) document.getElementById('lap-masuk-tunai').innerText = `Rp ${rp(omsetTunai)}`;
+            if (document.getElementById('lap-masuk-online')) document.getElementById('lap-masuk-online').innerText = `Rp ${rp(omsetOnline)}`;
+            if (document.getElementById('lap-masuk-total')) document.getElementById('lap-masuk-total').innerText = `Rp ${rp(totalOmset)}`;
+            if (document.getElementById('lap-hpp-total')) document.getElementById('lap-hpp-total').innerText = `Rp ${rp(totalHpp)}`;
+            if (document.getElementById('lap-keluar')) document.getElementById('lap-keluar').innerText = `Rp ${rp(totalPengeluaran)}`;
+            if (document.getElementById('lap-laba')) document.getElementById('lap-laba').innerText = `Rp ${rp(labaBersih)}`;
+        }
+
+        function renderTerjual() {
+            let tbody = document.querySelector('#table-terjual tbody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            let sorted = [...db.salesItems].sort((a, b) => b.qty - a.qty);
+            sorted.forEach(s => {
+                let prod = db.products.find(p => p.name === s.nama);
+                let estNominal = prod ? (prod.price * s.qty) : 0;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${getIcon(s.nama)}${s.nama}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600;">${s.kategori}</span></td>
+                        <td style="text-align:center;"><b style="color:#2563eb;">${s.qty}</b></td>
+                        <td style="text-align:right;"><b style="color:#10b981;">Rp ${rp(estNominal)}</b></td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ================= MASTER MENU & RESEP ================= //
+        function renderMasterMenu() {
+            let tbody = document.querySelector('#table-menu tbody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            db.products.forEach((m, idx) => {
+                let imgTag = m.img ? `<img src="${m.img}" style="width:40px; height:40px; object-fit:cover; border-radius:6px;">` : '📷';
+                let hpp = hitungHPPProduk(m);
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="text-align:center;">${imgTag}</td>
+                        <td><b>${m.name}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${m.category}</span></td>
+                        <td>
+                            <b>Rp ${rp(m.price)}</b><br>
+                            <small style="color:#b45309;">HPP: Rp ${rp(hpp)}</small>
+                        </td>
+                        <td style="text-align:center;">
+                            <button class="btn-edit" onclick="editMenu(${idx})">Edit</button>
+                            <button class="btn-delete" onclick="hapusMenu(${idx})">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function tambahBarisResep(ingredientId = '', amountNeeded = '') {
+            let container = document.getElementById('resep-container');
+            if (!container) return;
+
+            let rowId = 'recipe_row_' + Date.now() + Math.random().toString(36).substring(2, 5);
+            let options = db.ingredients.map(ing => `<option value="${ing.id}" ${ing.id === ingredientId ? 'selected' : ''}>${ing.name} (${ing.unit})</option>`).join('');
+
+            let div = document.createElement('div');
+            div.id = rowId;
+            div.style.cssText = 'display:flex; gap:8px; margin-bottom:8px; align-items:center;';
+            div.innerHTML = `
+                <select class="resep-ing-id form-group" style="flex:2; margin-bottom:0;">
+                    <option value="">-- Pilih Bahan --</option>
+                    ${options}
+                </select>
+                <input type="number" class="resep-ing-qty form-group" placeholder="Jumlah" value="${amountNeeded}" style="flex:1; margin-bottom:0;">
+                <button onclick="document.getElementById('${rowId}').remove()" style="background:#ef4444; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">✕</button>
             `;
-
-            printWin.document.open();
-            printWin.document.write(htmlContent);
-            printWin.document.close();
+            container.appendChild(div);
         }
 
-        // Dummy renderer pendukung halaman lain
-        function renderPengeluaran() {}
-        function renderLaporan() {}
-        function renderTerjual() {}
-        function renderAudit() {}
-        function toggleFilterTanggalPengeluaran() {}
-        function tambahPengeluaran() {}
-        function exportPDF() {}
-        function generateQR() {}
-        function bukaSimulasiPelanggan() {}
-        function tutupSimulasi() {
+        async function simpanMenuData() {
+            let nama = document.getElementById('m-nama').value;
+            let kategori = document.getElementById('m-kategori').value;
+            let harga = parseInt(document.getElementById('m-harga').value);
+            let img = document.getElementById('m-img').value;
+
+            if(!nama || isNaN(harga)) return Swal.fire({ icon: 'warning', title: 'Gagal', text: 'Nama dan harga menu wajib diisi!' });
+
+            let recipes = [];
+            let rows = document.querySelectorAll('#resep-container > div');
+            rows.forEach(r => {
+                let ingId = r.querySelector('.resep-ing-id').value;
+                let qty = parseFloat(r.querySelector('.resep-ing-qty').value);
+                if(ingId && !isNaN(qty) && qty > 0) {
+                    recipes.push({ ingredient_id: ingId, amount_needed: qty });
+                }
+            });
+
+            if (editModeIndex > -1) {
+                db.products[editModeIndex] = { ...db.products[editModeIndex], name: nama, category: kategori, price: harga, img: img, recipes: recipes };
+                recordAudit('UPDATE_MENU', `Ubah menu: ${nama}`);
+                editModeIndex = -1;
+                document.getElementById('alert-edit').style.display = 'none';
+            } else {
+                let newProd = { id: 'prod_' + Date.now(), name: nama, category: kategori, price: harga, img: img, recipes: recipes };
+                db.products.push(newProd);
+                recordAudit('ADD_MENU', `Tambah menu baru: ${nama}`);
+            }
+
+            await saveDB();
+            renderSemua();
+            batalEditMenu();
+            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data menu berhasil disimpan.', timer: 1200, showConfirmButton: false });
+        }
+
+        function editMenu(index) {
+            editModeIndex = index;
+            let m = db.products[index];
+            document.getElementById('m-nama').value = m.name;
+            document.getElementById('m-kategori').value = m.category;
+            document.getElementById('m-harga').value = m.price;
+            document.getElementById('m-img').value = m.img || '';
+            document.getElementById('alert-edit').style.display = 'flex';
+            
+            let container = document.getElementById('resep-container');
+            container.innerHTML = '';
+            if (m.recipes && m.recipes.length > 0) {
+                m.recipes.forEach(r => tambahBarisResep(r.ingredient_id, r.amount_needed));
+            }
+            document.getElementById('btn-simpan-menu').innerText = '💾 Perbarui Data Menu';
+        }
+
+        function batalEditMenu() {
+            editModeIndex = -1;
+            document.getElementById('m-nama').value = '';
+            document.getElementById('m-harga').value = '';
+            document.getElementById('m-img').value = '';
+            document.getElementById('resep-container').innerHTML = '';
+            document.getElementById('alert-edit').style.display = 'none';
+            document.getElementById('btn-simpan-menu').innerText = '💾 Simpan Menu Baru';
+        }
+
+        async function hapusMenu(index) {
+            let confirm = await Swal.fire({ title: 'Hapus Menu?', text: 'Menu ini akan dihapus permanen.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+            if (confirm.isConfirmed) {
+                recordAudit('DELETE_MENU', `Hapus menu: ${db.products[index].name}`);
+                db.products.splice(index, 1);
+                await saveDB();
+                renderSemua();
+            }
+        }
+
+        // ================= STOK BAHAN BAKU ================= //
+        function renderStok() {
+            let tbody = document.querySelector('#table-stok tbody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            db.ingredients.forEach((ing, idx) => {
+                let isWarning = ing.current_stock <= ing.min_stock;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${ing.name}</b></td>
+                        <td><b style="color: ${isWarning ? '#ef4444' : '#10b981'}">${ing.current_stock}</b></td>
+                        <td>${ing.unit}</td>
+                        <td>Rp ${rp(ing.cost_per_unit)}</td>
+                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusStok(${idx})">Hapus</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function simpanStok() {
+            let nama = document.getElementById('s-nama-baru').value;
+            let unit = document.getElementById('s-unit').value;
+            let qty = parseFloat(document.getElementById('s-qty').value);
+            let min = parseFloat(document.getElementById('s-min').value);
+            let cost = parseFloat(document.getElementById('s-cost').value);
+
+            if(!nama || isNaN(qty)) return Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Nama dan jumlah stok wajib diisi!' });
+
+            let newIng = { id: 'ing_' + Date.now(), name: nama, unit: unit, current_stock: qty, min_stock: min || 0, cost_per_unit: cost || 0 };
+            db.ingredients.push(newIng);
+            
+            recordAudit('ADD_INGREDIENT', `Tambah stok bahan baku: ${nama}`);
+            await saveDB();
+            renderSemua();
+
+            document.getElementById('s-nama-baru').value = '';
+            document.getElementById('s-qty').value = '';
+            document.getElementById('s-min').value = '';
+            document.getElementById('s-cost').value = '';
+            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Bahan baku berhasil ditambahkan.' });
+        }
+
+        async function hapusStok(index) {
+            let confirm = await Swal.fire({ title: 'Hapus Bahan?', text: 'Data bahan mentah ini akan dihapus.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+            if (confirm.isConfirmed) {
+                recordAudit('DELETE_INGREDIENT', `Hapus bahan: ${db.ingredients[index].name}`);
+                db.ingredients.splice(index, 1);
+                await saveDB();
+                renderSemua();
+            }
+        }
+
+        // ================= QR CODE & UTILS ================= //
+        function generateQR() {
+            let inputMeja = document.getElementById('qr-input-meja').value;
+            if(!inputMeja) return Swal.fire({ icon: 'warning', title: 'Oops', text: 'Masukkan nomor/nama meja!' });
+            
+            mejaAktif = inputMeja;
+            let container = document.getElementById('qr-code-canvas');
+            container.innerHTML = '';
+            
+            let currentUrl = window.location.href.split('?')[0];
+            let targetUrl = `${currentUrl}?meja=${encodeURIComponent(mejaAktif)}`;
+
+            new QRCode(container, {
+                text: targetUrl,
+                width: 180,
+                height: 180
+            });
+
+            document.getElementById('qr-meja-label').innerText = "QR Code " + mejaAktif;
+            document.getElementById('qr-result-box').style.display = 'block';
+        }
+
+        function bukaSimulasiPelanggan() {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-kasir').classList.add('active');
+            document.getElementById('page-customer').classList.add('active');
+            document.getElementById('cust-meja-title').innerText = "Pesan untuk: " + mejaAktif;
+            switchTab('biasa', 'customer');
         }
-        function simpanMenuData() {}
-        function batalEditMenu() {}
-        function tambahBarisResep() {}
-        function simpanStok() {}
+
+        function tutupSimulasi() {
+            nav('kasir');
+        }
+
+        function renderAudit() {
+            let tbody = document.querySelector('#table-audit tbody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            db.audit_logs.forEach(log => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><small style="color:#64748b;">${log.timestamp}</small></td>
+                        <td><b>${log.user_id}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600;">${log.action}</span></td>
+                        <td><small>${log.details}</small></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function cetakStruk(tipe, indexOrder) {
+            let order = db.orders[indexOrder];
+            if (!order) return;
+
+            let printArea = document.getElementById('printable-area');
+            let namaToko = getSettingValue('namaToko', 'KEDAI KITA PRO');
+            let alamatToko = getSettingValue('alamatToko', 'Pusat Kota');
+            let footerNote = getSettingValue('footerNote', 'Terima kasih atas kunjungannya!');
+
+            if (tipe === 'dapur') {
+                printArea.innerHTML = `
+                    <div style="font-family:monospace; width:280px; padding:10px; font-size:12px;">
+                        <h3 style="text-align:center;">STRUK DAPUR</h3>
+                        <p><b>Meja:</b> ${order.meja}</p>
+                        <p><b>Waktu:</b> ${order.waktu}</p>
+                        <hr style="border-top:1px dashed #000;">
+                        <div>${order.rincian}</div>
+                        <hr style="border-top:1px dashed #000;">
+                    </div>
+                `;
+            } else {
+                printArea.innerHTML = `
+                    <div style="font-family:monospace; width:280px; padding:10px; font-size:12px;">
+                        <h3 style="text-align:center;">${namaToko}</h3>
+                        <p style="text-align:center; font-size:10px;">${alamatToko}</p>
+                        <hr style="border-top:1px dashed #000;">
+                        <p><b>Meja:</b> ${order.meja}</p>
+                        <p><b>Waktu:</b> ${order.waktu}</p>
+                        <p><b>Metode:</b> ${order.pembayaran || 'Tunai'}</p>
+                        <hr style="border-top:1px dashed #000;">
+                        <div>${order.rincian}</div>
+                        <hr style="border-top:1px dashed #000;">
+                        <p style="text-align:right;"><b>Total: Rp ${rp(order.total)}</b></p>
+                        ${order.uangDiterima ? `<p style="text-align:right;">Bayar: Rp ${rp(order.uangDiterima)}</p>` : ''}
+                        ${order.uangDiterima ? `<p style="text-align:right;">Kembali: Rp ${rp(order.uangDiterima - order.total)}</p>` : ''}
+                        <hr style="border-top:1px dashed #000;">
+                        <p style="text-align:center; font-size:10px;">${footerNote}</p>
+                    </div>
+                `;
+            }
+            window.print();
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(16);
+            doc.text(getSettingValue('namaToko', 'KEDAI KITA PRO'), 14, 15);
+            doc.setFontSize(10);
+            doc.text("Laporan Keuangan & Penjualan", 14, 22);
+
+            let bodyData = db.orders.filter(o => o.status === 'selesai').map(o => [
+                o.waktu, o.meja, o.pembayaran || 'Tunai', `Rp ${rp(o.total)}`
+            ]);
+
+            doc.autoTable({
+                startY: 28,
+                head: [['Waktu', 'Meja', 'Pembayaran', 'Total']],
+                body: bodyData,
+            });
+
+            doc.save(`Laporan_Penjualan_${new Date().toISOString().split('T')[0]}.pdf`);
+        }
     </script>
 </body>
 </html>
