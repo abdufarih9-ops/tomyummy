@@ -23,6 +23,17 @@
     
     <style>
         /* ================= CSS DASAR & UI MODERN ================= */
+        /* Sembunyikan struk di layar */
+#receipt, .receipt-container, #struk-print {
+    display: none !important;
+}
+
+@media print {
+    #receipt, .receipt-container, #struk-print {
+        display: block !important;
+    }
+}
+
         * { 
             box-sizing: border-box; 
             margin: 0; 
