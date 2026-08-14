@@ -23,17 +23,6 @@
     
     <style>
         /* ================= CSS DASAR & UI MODERN ================= */
-        /* Sembunyikan struk di layar */
-#receipt, .receipt-container, #struk-print {
-    display: none !important;
-}
-
-@media print {
-    #receipt, .receipt-container, #struk-print {
-        display: block !important;
-    }
-}
-
         * { 
             box-sizing: border-box; 
             margin: 0; 
@@ -848,6 +837,13 @@
 
                 <h4 style="font-size:15px; border-bottom:2px solid #f1f5f9; padding-bottom:8px; margin-top:24px; margin-bottom:12px; color:#0f172a; font-weight:600;">Format Perangkat Kasir</h4>
                 <div class="form-group">
+                    <label>Metode Cetak Printer</label>
+                    <select id="setting-print-mode" onchange="updateStrukPreview()">
+                        <option value="rawbt">RawBT App (Bluetooth Android Thermal)</option>
+                        <option value="standard">Standard Web Print / Desktop Printer</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Ukuran Kertas Printer Thermal</label>
                     <select id="setting-printer-width" onchange="updateStrukPreview()">
                         <option value="58">58mm (Kertas Portable/Bluetooth Kecil)</option>
@@ -998,7 +994,8 @@
                         { key: 'footerNote', value: 'Terima kasih atas kunjungannya!' },
                         { key: 'pajakPct', value: '0' },
                         { key: 'servicePct', value: '0' },
-                        { key: 'printerWidth', value: '58' }
+                        { key: 'printerWidth', value: '58' },
+                        { key: 'printMode', value: 'rawbt' }
                     ];
                     db.audit_logs = [{ id: 'log_0', user_id: 'System', action: 'INIT_DB', details: 'Sistem siap digunakan.', timestamp: new Date().toLocaleString('id-ID') }];
                     await saveDB();
@@ -1652,6 +1649,7 @@
             if (document.getElementById('setting-pajak-pct')) document.getElementById('setting-pajak-pct').value = getSettingValue('pajakPct', '0');
             if (document.getElementById('setting-service-pct')) document.getElementById('setting-service-pct').value = getSettingValue('servicePct', '0');
             if (document.getElementById('setting-printer-width')) document.getElementById('setting-printer-width').value = getSettingValue('printerWidth', '58');
+            if (document.getElementById('setting-print-mode')) document.getElementById('setting-print-mode').value = getSettingValue('printMode', 'rawbt');
             updateStrukPreview();
         }
 
@@ -1713,6 +1711,7 @@
             let pajakPct = document.getElementById('setting-pajak-pct').value;
             let servicePct = document.getElementById('setting-service-pct').value;
             let printerWidth = document.getElementById('setting-printer-width').value;
+            let printMode = document.getElementById('setting-print-mode').value;
 
             if(!nama) return Swal.fire({ icon: 'error', title: 'Oops', text: 'Nama outlet wajib diisi!' });
 
@@ -1730,10 +1729,104 @@
             updateSetting('pajakPct', pajakPct || '0'); 
             updateSetting('servicePct', servicePct || '0');
             updateSetting('printerWidth', printerWidth || '58');
+            updateSetting('printMode', printMode || 'rawbt');
 
             recordAudit('UPDATE_SETTINGS', `Ubah profil toko: ${nama}`);
             saveDB(); renderSemua();
             Swal.fire({ icon: 'success', title: 'Berhasil Disimpan', text: 'Konfigurasi sistem & struk berhasil diperbarui.' });
+        }
+
+        /* ================= KONEKSI CETAK PRINTER RAWBT ================= */
+        function cetakStruk(tipe, indexOrder) {
+            let order = db.orders[indexOrder];
+            if (!order) return;
+
+            let namaToko = getSettingValue('namaToko', 'KEDAI KITA PRO');
+            let alamat = getSettingValue('alamatToko', 'Pusat Kota');
+            let noHp = getSettingValue('noHpToko', '0812-3456-7890');
+            let printMode = getSettingValue('printMode', 'rawbt');
+            let printerWidth = getSettingValue('printerWidth', '58');
+            let charLimit = printerWidth === '80' ? 48 : 32;
+
+            function line(char = '-') { return char.repeat(charLimit); }
+            function alignCenter(text) {
+                let pad = Math.floor((charLimit - text.length) / 2);
+                return ' '.repeat(pad > 0 ? pad : 0) + text;
+            }
+            function alignBetween(left, right) {
+                let space = charLimit - (left.length + right.length);
+                return left + ' '.repeat(space > 0 ? space : 1) + right;
+            }
+
+            let textToPrint = "";
+
+            if (tipe === 'dapur') {
+                textToPrint += alignCenter("=== STRUK DAPUR ===") + "\n";
+                textToPrint += alignBetween("Meja: " + order.meja, order.waktu.split(',')[1] || order.waktu) + "\n";
+                textToPrint += line('=') + "\n";
+                if (order.items && order.items.length > 0) {
+                    order.items.forEach(item => {
+                        textToPrint += `${item.qty}x ${item.nama}\n`;
+                        if (item.note) textToPrint += `   *Note: ${item.note}\n`;
+                    });
+                } else {
+                    let cleanStr = order.rincian.replace(/<br\s*[\/]?>/gi, "\n").replace(/<[^>]+>/g, "");
+                    textToPrint += cleanStr + "\n";
+                }
+                textToPrint += line('=') + "\n\n\n";
+            } else {
+                textToPrint += alignCenter(namaToko) + "\n";
+                textToPrint += alignCenter(alamat) + "\n";
+                textToPrint += alignCenter("Telp/WA: " + noHp) + "\n";
+                textToPrint += line('-') + "\n";
+                textToPrint += alignBetween("No: " + (order.order_number || order.id), "Meja: " + order.meja) + "\n";
+                textToPrint += alignBetween("Kasir: " + currentUser.name, order.waktu) + "\n";
+                textToPrint += line('-') + "\n";
+
+                if (order.items && order.items.length > 0) {
+                    order.items.forEach(item => {
+                        textToPrint += item.nama + "\n";
+                        let priceLine = `  ${item.qty} x ${rp(item.harga)}`;
+                        let totalLine = rp(item.harga * item.qty);
+                        textToPrint += alignBetween(priceLine, totalLine) + "\n";
+                        if (item.note) textToPrint += `   *Note: ${item.note}\n`;
+                    });
+                } else {
+                    let cleanStr = order.rincian.replace(/<br\s*[\/]?>/gi, "\n").replace(/<[^>]+>/g, "");
+                    textToPrint += cleanStr + "\n";
+                }
+
+                textToPrint += line('-') + "\n";
+                textToPrint += alignBetween("Subtotal:", rp(order.subtotal || order.total)) + "\n";
+
+                if (order.service && order.service > 0) {
+                    textToPrint += alignBetween("Service:", rp(order.service)) + "\n";
+                }
+                if (order.pajak && order.pajak > 0) {
+                    textToPrint += alignBetween("Pajak:", rp(order.pajak)) + "\n";
+                }
+
+                textToPrint += line('=') + "\n";
+                textToPrint += alignBetween("TOTAL:", "Rp " + rp(order.total)) + "\n";
+                textToPrint += alignBetween("Bayar (" + (order.pembayaran || 'Tunai') + "):", "Rp " + rp(order.uangDiterima || order.total)) + "\n";
+                let kembalian = (order.uangDiterima || order.total) - order.total;
+                textToPrint += alignBetween("Kembalian:", "Rp " + rp(kembalian > 0 ? kembalian : 0)) + "\n";
+                textToPrint += line('-') + "\n";
+                textToPrint += alignCenter(getSettingValue('footerNote', 'Terima Kasih Atas Kunjungannya!')) + "\n\n\n";
+            }
+
+            // Eksekusi Cetak ke Aplikasi RawBT atau Web Print
+            if (printMode === 'rawbt' || /Android/i.test(navigator.userAgent)) {
+                let S = textToPrint;
+                let intentUrl = "intent:#Intent;scheme=rawbt;package=ru.a404m.rawbtprinter;S.txt=" + encodeURIComponent(S) + ";end;";
+                window.location.href = intentUrl;
+            } else {
+                let area = document.getElementById('printable-area');
+                if (area) {
+                    area.innerHTML = `<pre style="font-family: monospace; font-size:12px; white-space: pre-wrap;">${textToPrint}</pre>`;
+                    window.print();
+                }
+            }
         }
 
         // ================= FUNGSI PENGELUARAN DENGAN FILTER HARI INI ================= //
@@ -1785,9 +1878,8 @@
                         <td><b style="color:#0f172a;">${p.keterangan}</b></td>
                         <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600; color:#475569;">${p.kategori}</span><br><small style="color:#94a3b8;">${p.metode || 'Tunai'}</small></td>
                         <td><b style="color:#dc2626;">Rp ${rp(p.nominal)}</b></td>
-                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusPengeluaran(${p.id})">Hapus</button></td>
-                    </tr>
-                `;
+                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusPengeluaran('${p.id}')">Hapus</button></td>
+                    </tr>`;
             });
 
             if (document.getElementById('txt-total-pengeluaran')) {
@@ -1797,196 +1889,185 @@
 
         async function tambahPengeluaran() {
             let ket = document.getElementById('p-ket').value;
-            let kat = document.getElementById('p-kategori').value;
+            let kategori = document.getElementById('p-kategori').value;
             let metode = document.getElementById('p-metode').value;
-            let nom = parseInt(document.getElementById('p-nominal').value);
+            let nominal = parseInt(document.getElementById('p-nominal').value) || 0;
             let tgl = document.getElementById('p-tgl').value;
 
-            if(!ket || !nom) return Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Keterangan dan nominal pengeluaran wajib diisi!' });
+            if (!ket || nominal <= 0) {
+                return Swal.fire({ icon: 'warning', title: 'Periksa Input', text: 'Keterangan dan Nominal wajib diisi dengan benar!' });
+            }
 
-            let newExp = { id: Date.now(), keterangan: ket, kategori: kat, metode: metode, nominal: nom, tanggal: tgl };
-            db.expenses.unshift(newExp);
-            
-            recordAudit('ADD_EXPENSE', `Pengeluaran ${kat}: ${ket} (Rp ${rp(nom)})`);
+            let newExpense = {
+                id: 'exp_' + Date.now(),
+                keterangan: ket,
+                kategori: kategori,
+                metode: metode,
+                nominal: nominal,
+                tanggal: tgl
+            };
+
+            db.expenses.unshift(newExpense);
+            recordAudit('ADD_EXPENSE', `Pengeluaran ${kategori}: ${ket} (Rp ${rp(nominal)})`);
             await saveDB();
             renderSemua();
 
             document.getElementById('p-ket').value = '';
             document.getElementById('p-nominal').value = '';
-            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Pengeluaran berhasil dicatat.', timer: 1200, showConfirmButton: false });
+            Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Pengeluaran telah dicatat.', timer: 1200, showConfirmButton: false });
         }
 
         async function hapusPengeluaran(id) {
-            let confirm = await Swal.fire({
-                title: 'Hapus Catatan?',
-                text: "Data pengeluaran ini akan dihapus permanen.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                confirmButtonText: 'Ya, Hapus'
-            });
-
-            if (confirm.isConfirmed) {
-                let idx = db.expenses.findIndex(p => p.id === id);
-                if (idx > -1) {
-                    recordAudit('DELETE_EXPENSE', `Hapus pengeluaran: ${db.expenses[idx].keterangan}`);
-                    db.expenses.splice(idx, 1);
-                    await saveDB();
-                    renderSemua();
-                    Swal.fire({ icon: 'success', title: 'Terhapus', text: 'Data berhasil dihapus.', timer: 1000, showConfirmButton: false });
-                }
+            let idx = db.expenses.findIndex(p => p.id === id);
+            if (idx > -1) {
+                let exp = db.expenses[idx];
+                db.expenses.splice(idx, 1);
+                recordAudit('DELETE_EXPENSE', `Hapus pengeluaran: ${exp.keterangan}`);
+                await saveDB();
+                renderSemua();
             }
         }
 
-        // ================= LAPORAN KEUANGAN & SISA LOGIKA ================= //
         function renderLaporan() {
-            let startDate = document.getElementById('filter-start')?.value;
-            let endDate = document.getElementById('filter-end')?.value;
+            let start = document.getElementById('filter-start')?.value;
+            let end = document.getElementById('filter-end')?.value;
 
-            let omsetTunai = 0, omsetOnline = 0, totalHpp = 0;
+            let totalTunai = 0, totalOnline = 0, totalOmset = 0, totalHPP = 0, totalPengeluaran = 0;
             let tbody = document.querySelector('#table-laporan-transaksi tbody');
-            if(tbody) tbody.innerHTML = '';
+            if (tbody) tbody.innerHTML = '';
 
-            let successOrders = db.orders.filter(o => o.status === 'selesai');
+            let filteredOrders = db.orders.filter(o => {
+                if (o.status !== 'selesai') return false;
+                let dateStr = o.isoDate ? o.isoDate.split('T')[0] : '';
+                if (start && dateStr < start) return false;
+                if (end && dateStr > end) return false;
+                return true;
+            });
 
-            if (startDate || endDate) {
-                successOrders = successOrders.filter(o => {
-                    let d = o.isoDate ? o.isoDate.split('T')[0] : '';
-                    if (startDate && d < startDate) return false;
-                    if (endDate && d > endDate) return false;
-                    return true;
-                });
-            }
-
-            successOrders.forEach(o => {
-                if (o.pembayaran === 'Tunai') omsetTunai += o.total;
-                else omsetOnline += o.total;
-
-                totalHpp += (o.total_cogs || 0);
+            filteredOrders.forEach(o => {
+                let isTunai = (o.pembayaran === 'Tunai');
+                if (isTunai) totalTunai += o.total; else totalOnline += o.total;
+                totalOmset += o.total;
+                totalHPP += (o.total_cogs || 0);
 
                 if (tbody) {
                     tbody.innerHTML += `
                         <tr>
                             <td><small style="color:#64748b;">${o.waktu}</small></td>
-                            <td><b>${o.meja}</b> (${o.pembayaran || 'Tunai'})<br><span style="font-size:11px; color:#475569;">${o.rincian}</span></td>
+                            <td><b style="color:#0f172a;">${o.meja}</b> <small style="color:#64748b;">(${o.pembayaran || 'Tunai'})</small><br>${o.rincian}</td>
                             <td><b style="color:#10b981;">Rp ${rp(o.total)}</b></td>
-                        </tr>
-                    `;
+                        </tr>`;
                 }
             });
 
-            let totalOmset = omsetTunai + omsetOnline;
-            
-            let totalPengeluaran = db.expenses.reduce((sum, p) => {
-                if (startDate || endDate) {
-                    if (startDate && p.tanggal < startDate) return sum;
-                    if (endDate && p.tanggal > endDate) return sum;
-                }
-                return sum + p.nominal;
-            }, 0);
+            db.expenses.forEach(p => {
+                if (start && p.tanggal < start) return;
+                if (end && p.tanggal > end) return;
+                totalPengeluaran += p.nominal;
+            });
 
-            let labaBersih = totalOmset - totalHpp - totalPengeluaran;
+            let labaBersih = totalOmset - totalHPP - totalPengeluaran;
 
-            if (document.getElementById('lap-masuk-tunai')) document.getElementById('lap-masuk-tunai').innerText = `Rp ${rp(omsetTunai)}`;
-            if (document.getElementById('lap-masuk-online')) document.getElementById('lap-masuk-online').innerText = `Rp ${rp(omsetOnline)}`;
+            if (document.getElementById('lap-masuk-tunai')) document.getElementById('lap-masuk-tunai').innerText = `Rp ${rp(totalTunai)}`;
+            if (document.getElementById('lap-masuk-online')) document.getElementById('lap-masuk-online').innerText = `Rp ${rp(totalOnline)}`;
             if (document.getElementById('lap-masuk-total')) document.getElementById('lap-masuk-total').innerText = `Rp ${rp(totalOmset)}`;
-            if (document.getElementById('lap-hpp-total')) document.getElementById('lap-hpp-total').innerText = `Rp ${rp(totalHpp)}`;
+            if (document.getElementById('lap-hpp-total')) document.getElementById('lap-hpp-total').innerText = `Rp ${rp(totalHPP)}`;
             if (document.getElementById('lap-keluar')) document.getElementById('lap-keluar').innerText = `Rp ${rp(totalPengeluaran)}`;
             if (document.getElementById('lap-laba')) document.getElementById('lap-laba').innerText = `Rp ${rp(labaBersih)}`;
         }
 
         function renderTerjual() {
             let tbody = document.querySelector('#table-terjual tbody');
-            if(!tbody) return;
+            if (!tbody) return;
             tbody.innerHTML = '';
 
-            let sorted = [...db.salesItems].sort((a, b) => b.qty - a.qty);
-            sorted.forEach(s => {
+            let items = [...db.salesItems];
+            items.sort((a, b) => b.qty - a.qty);
+
+            items.forEach(s => {
                 let prod = db.products.find(p => p.name === s.nama);
-                let estNominal = prod ? (prod.price * s.qty) : 0;
+                let harga = prod ? prod.price : 0;
+                let estimasi = s.qty * harga;
+
                 tbody.innerHTML += `
                     <tr>
-                        <td><b>${getIcon(s.nama)}${s.nama}</b></td>
-                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600;">${s.kategori}</span></td>
-                        <td style="text-align:center;"><b style="color:#2563eb;">${s.qty}</b></td>
-                        <td style="text-align:right;"><b style="color:#10b981;">Rp ${rp(estNominal)}</b></td>
-                    </tr>
-                `;
+                        <td><b>${s.nama}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${s.kategori || 'Biasa'}</span></td>
+                        <td style="text-align:center;"><b>${s.qty}</b></td>
+                        <td style="text-align:right;"><b style="color:#e74c3c;">Rp ${rp(estimasi)}</b></td>
+                    </tr>`;
             });
         }
 
-        // ================= MASTER MENU & RESEP ================= //
         function renderMasterMenu() {
             let tbody = document.querySelector('#table-menu tbody');
-            if(!tbody) return;
+            if (!tbody) return;
             tbody.innerHTML = '';
 
-            db.products.forEach((m, idx) => {
-                let imgTag = m.img ? `<img src="${m.img}" style="width:40px; height:40px; object-fit:cover; border-radius:6px;">` : '📷';
-                let hpp = hitungHPPProduk(m);
-                
+            db.products.forEach((p, idx) => {
+                let hpp = hitungHPPProduk(p);
+                let resepTxt = (p.recipes && p.recipes.length > 0) ? `${p.recipes.length} Bahan (HPP: Rp ${rp(hpp)})` : '<small style="color:#94a3b8;">Tanpa Resep</small>';
+                let imgThumb = p.img ? `<img src="${p.img}" style="width:40px; height:40px; border-radius:6px; object-fit:cover;">` : '📷';
+
                 tbody.innerHTML += `
                     <tr>
-                        <td style="text-align:center;">${imgTag}</td>
-                        <td><b>${m.name}</b></td>
-                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${m.category}</span></td>
-                        <td>
-                            <b>Rp ${rp(m.price)}</b><br>
-                            <small style="color:#b45309;">HPP: Rp ${rp(hpp)}</small>
-                        </td>
+                        <td style="text-align:center;">${imgThumb}</td>
+                        <td><b>${p.name}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${p.category}</span></td>
+                        <td><b>Rp ${rp(p.price)}</b><br><small style="color:#64748b;">${resepTxt}</small></td>
                         <td style="text-align:center;">
                             <button class="btn-edit" onclick="editMenu(${idx})">Edit</button>
-                            <button class="btn-delete" onclick="hapusMenu(${idx})">Hapus</button>
+                            <button class="btn-delete" onclick="hapusMenu('${p.id}')">Hapus</button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
 
-        function tambahBarisResep(ingredientId = '', amountNeeded = '') {
+        function tambahBarisResep(selectedIngId = '', qtyNeeded = '') {
             let container = document.getElementById('resep-container');
             if (!container) return;
 
-            let rowId = 'recipe_row_' + Date.now() + Math.random().toString(36).substring(2, 5);
-            let options = db.ingredients.map(ing => `<option value="${ing.id}" ${ing.id === ingredientId ? 'selected' : ''}>${ing.name} (${ing.unit})</option>`).join('');
+            let rowId = 'resep_row_' + Date.now() + Math.random().toString(36).substr(2, 4);
+            let optionsHTML = db.ingredients.map(ing => `<option value="${ing.id}" ${ing.id === selectedIngId ? 'selected' : ''}>${ing.name} (${ing.unit})</option>`).join('');
 
-            let div = document.createElement('div');
-            div.id = rowId;
-            div.style.cssText = 'display:flex; gap:8px; margin-bottom:8px; align-items:center;';
-            div.innerHTML = `
-                <select class="resep-ing-id form-group" style="flex:2; margin-bottom:0;">
-                    <option value="">-- Pilih Bahan --</option>
-                    ${options}
-                </select>
-                <input type="number" class="resep-ing-qty form-group" placeholder="Jumlah" value="${amountNeeded}" style="flex:1; margin-bottom:0;">
-                <button onclick="document.getElementById('${rowId}').remove()" style="background:#ef4444; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">✕</button>
-            `;
-            container.appendChild(div);
+            let rowHTML = `
+                <div id="${rowId}" style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+                    <select class="resep-ing-id" style="flex:2; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                        <option value="">-- Pilih Bahan Baku --</option>
+                        ${optionsHTML}
+                    </select>
+                    <input type="number" class="resep-qty" placeholder="Jumlah" value="${qtyNeeded}" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                    <button type="button" onclick="document.getElementById('${rowId}').remove()" style="background:#ef4444; color:white; border:none; padding:6px 10px; border-radius:6px; font-weight:bold; cursor:pointer;">✕</button>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', rowHTML);
         }
 
         async function simpanMenuData() {
             let nama = document.getElementById('m-nama').value;
             let kategori = document.getElementById('m-kategori').value;
-            let harga = parseInt(document.getElementById('m-harga').value);
+            let harga = parseInt(document.getElementById('m-harga').value) || 0;
             let img = document.getElementById('m-img').value;
 
-            if(!nama || isNaN(harga)) return Swal.fire({ icon: 'warning', title: 'Gagal', text: 'Nama dan harga menu wajib diisi!' });
+            if (!nama || harga <= 0) {
+                return Swal.fire({ icon: 'warning', title: 'Periksa Input', text: 'Nama menu dan harga jual wajib diisi!' });
+            }
 
             let recipes = [];
             let rows = document.querySelectorAll('#resep-container > div');
             rows.forEach(r => {
                 let ingId = r.querySelector('.resep-ing-id').value;
-                let qty = parseFloat(r.querySelector('.resep-ing-qty').value);
-                if(ingId && !isNaN(qty) && qty > 0) {
-                    recipes.push({ ingredient_id: ingId, amount_needed: qty });
-                }
+                let qty = parseFloat(r.querySelector('.resep-qty').value) || 0;
+                if (ingId && qty > 0) recipes.push({ ingredient_id: ingId, amount_needed: qty });
             });
 
             if (editModeIndex > -1) {
-                db.products[editModeIndex] = { ...db.products[editModeIndex], name: nama, category: kategori, price: harga, img: img, recipes: recipes };
-                recordAudit('UPDATE_MENU', `Ubah menu: ${nama}`);
+                db.products[editModeIndex].name = nama;
+                db.products[editModeIndex].category = kategori;
+                db.products[editModeIndex].price = harga;
+                db.products[editModeIndex].img = img;
+                db.products[editModeIndex].recipes = recipes;
+                recordAudit('EDIT_MENU', `Edit menu: ${nama}`);
                 editModeIndex = -1;
-                document.getElementById('alert-edit').style.display = 'none';
             } else {
                 let newProd = { id: 'prod_' + Date.now(), name: nama, category: kategori, price: harga, img: img, recipes: recipes };
                 db.products.push(newProd);
@@ -1994,26 +2075,30 @@
             }
 
             await saveDB();
-            renderSemua();
             batalEditMenu();
-            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data menu berhasil disimpan.', timer: 1200, showConfirmButton: false });
+            renderSemua();
+            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data menu telah diperbarui.', timer: 1200, showConfirmButton: false });
         }
 
         function editMenu(index) {
+            let p = db.products[index];
             editModeIndex = index;
-            let m = db.products[index];
-            document.getElementById('m-nama').value = m.name;
-            document.getElementById('m-kategori').value = m.category;
-            document.getElementById('m-harga').value = m.price;
-            document.getElementById('m-img').value = m.img || '';
-            document.getElementById('alert-edit').style.display = 'flex';
-            
+
+            document.getElementById('m-nama').value = p.name;
+            document.getElementById('m-kategori').value = p.category;
+            document.getElementById('m-harga').value = p.price;
+            document.getElementById('m-img').value = p.img || '';
+
             let container = document.getElementById('resep-container');
-            container.innerHTML = '';
-            if (m.recipes && m.recipes.length > 0) {
-                m.recipes.forEach(r => tambahBarisResep(r.ingredient_id, r.amount_needed));
+            if (container) container.innerHTML = '';
+
+            if (p.recipes && p.recipes.length > 0) {
+                p.recipes.forEach(r => tambahBarisResep(r.ingredient_id, r.amount_needed));
             }
-            document.getElementById('btn-simpan-menu').innerText = '💾 Perbarui Data Menu';
+
+            document.getElementById('alert-edit').style.display = 'flex';
+            document.getElementById('btn-simpan-menu').innerText = '💾 Update Data Menu';
+            window.scrollTo({ top: document.getElementById('form-master-menu').offsetTop - 80, behavior: 'smooth' });
         }
 
         function batalEditMenu() {
@@ -2026,49 +2111,51 @@
             document.getElementById('btn-simpan-menu').innerText = '💾 Simpan Menu Baru';
         }
 
-        async function hapusMenu(index) {
-            let confirm = await Swal.fire({ title: 'Hapus Menu?', text: 'Menu ini akan dihapus permanen.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
-            if (confirm.isConfirmed) {
-                recordAudit('DELETE_MENU', `Hapus menu: ${db.products[index].name}`);
-                db.products.splice(index, 1);
+        async function hapusMenu(id) {
+            let idx = db.products.findIndex(p => p.id === id);
+            if (idx > -1) {
+                let nama = db.products[idx].name;
+                db.products.splice(idx, 1);
+                recordAudit('DELETE_MENU', `Hapus menu: ${nama}`);
                 await saveDB();
                 renderSemua();
             }
         }
 
-        // ================= STOK BAHAN BAKU ================= //
         function renderStok() {
             let tbody = document.querySelector('#table-stok tbody');
-            if(!tbody) return;
+            if (!tbody) return;
             tbody.innerHTML = '';
 
-            db.ingredients.forEach((ing, idx) => {
-                let isWarning = ing.current_stock <= ing.min_stock;
+            db.ingredients.forEach(i => {
+                let isWarning = i.current_stock <= i.min_stock;
+                let badgeClass = isWarning ? 'color:#ef4444; font-weight:bold;' : 'color:#10b981; font-weight:bold;';
+
                 tbody.innerHTML += `
                     <tr>
-                        <td><b>${ing.name}</b></td>
-                        <td><b style="color: ${isWarning ? '#ef4444' : '#10b981'}">${ing.current_stock}</b></td>
-                        <td>${ing.unit}</td>
-                        <td>Rp ${rp(ing.cost_per_unit)}</td>
-                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusStok(${idx})">Hapus</button></td>
-                    </tr>
-                `;
+                        <td><b>${i.name}</b></td>
+                        <td style="${badgeClass}">${i.current_stock}</td>
+                        <td>${i.unit}</td>
+                        <td>Rp ${rp(i.cost_per_unit)}</td>
+                        <td style="text-align:center;"><button class="btn-delete" onclick="hapusStok('${i.id}')">Hapus</button></td>
+                    </tr>`;
             });
         }
 
         async function simpanStok() {
             let nama = document.getElementById('s-nama-baru').value;
             let unit = document.getElementById('s-unit').value;
-            let qty = parseFloat(document.getElementById('s-qty').value);
-            let min = parseFloat(document.getElementById('s-min').value);
-            let cost = parseFloat(document.getElementById('s-cost').value);
+            let qty = parseFloat(document.getElementById('s-qty').value) || 0;
+            let min = parseFloat(document.getElementById('s-min').value) || 0;
+            let cost = parseFloat(document.getElementById('s-cost').value) || 0;
 
-            if(!nama || isNaN(qty)) return Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Nama dan jumlah stok wajib diisi!' });
+            if (!nama || qty <= 0) {
+                return Swal.fire({ icon: 'warning', title: 'Periksa Input', text: 'Nama bahan baku dan stok awal wajib diisi!' });
+            }
 
-            let newIng = { id: 'ing_' + Date.now(), name: nama, unit: unit, current_stock: qty, min_stock: min || 0, cost_per_unit: cost || 0 };
+            let newIng = { id: 'ing_' + Date.now(), name: nama, unit: unit, current_stock: qty, min_stock: min, cost_per_unit: cost };
             db.ingredients.push(newIng);
-            
-            recordAudit('ADD_INGREDIENT', `Tambah stok bahan baku: ${nama}`);
+            recordAudit('ADD_STOCK', `Tambah stok bahan: ${nama} (${qty} ${unit})`);
             await saveDB();
             renderSemua();
 
@@ -2076,39 +2163,51 @@
             document.getElementById('s-qty').value = '';
             document.getElementById('s-min').value = '';
             document.getElementById('s-cost').value = '';
-            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Bahan baku berhasil ditambahkan.' });
+            Swal.fire({ icon: 'success', title: 'Tersimpan', text: 'Data bahan baku ditambahkan.', timer: 1200, showConfirmButton: false });
         }
 
-        async function hapusStok(index) {
-            let confirm = await Swal.fire({ title: 'Hapus Bahan?', text: 'Data bahan mentah ini akan dihapus.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
-            if (confirm.isConfirmed) {
-                recordAudit('DELETE_INGREDIENT', `Hapus bahan: ${db.ingredients[index].name}`);
-                db.ingredients.splice(index, 1);
+        async function hapusStok(id) {
+            let idx = db.ingredients.findIndex(i => i.id === id);
+            if (idx > -1) {
+                let nama = db.ingredients[idx].name;
+                db.ingredients.splice(idx, 1);
+                recordAudit('DELETE_STOCK', `Hapus bahan baku: ${nama}`);
                 await saveDB();
                 renderSemua();
             }
         }
 
-        // ================= QR CODE & UTILS ================= //
+        function renderAudit() {
+            let tbody = document.querySelector('#table-audit tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            db.audit_logs.forEach(log => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><small style="color:#64748b;">${log.timestamp}</small></td>
+                        <td><b>${log.user_id}</b></td>
+                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600;">${log.action}</span></td>
+                        <td><small style="color:#334155;">${log.details}</small></td>
+                    </tr>`;
+            });
+        }
+
         function generateQR() {
             let inputMeja = document.getElementById('qr-input-meja').value;
-            if(!inputMeja) return Swal.fire({ icon: 'warning', title: 'Oops', text: 'Masukkan nomor/nama meja!' });
-            
+            if (!inputMeja) return Swal.fire({ icon: 'warning', title: 'Kosong', text: 'Isi nama/nomor meja terlebih dahulu!' });
+
             mejaAktif = inputMeja;
-            let container = document.getElementById('qr-code-canvas');
-            container.innerHTML = '';
-            
-            let currentUrl = window.location.href.split('?')[0];
-            let targetUrl = `${currentUrl}?meja=${encodeURIComponent(mejaAktif)}`;
+            let baseUrl = window.location.href.split('?')[0];
+            let targetUrl = baseUrl + '?meja=' + encodeURIComponent(inputMeja);
 
-            new QRCode(container, {
-                text: targetUrl,
-                width: 180,
-                height: 180
-            });
+            let box = document.getElementById('qr-result-box');
+            let canvasBox = document.getElementById('qr-code-canvas');
+            canvasBox.innerHTML = '';
+            document.getElementById('qr-meja-label').innerText = "QR Code " + inputMeja;
 
-            document.getElementById('qr-meja-label').innerText = "QR Code " + mejaAktif;
-            document.getElementById('qr-result-box').style.display = 'block';
+            new QRCode(canvasBox, { text: targetUrl, width: 180, height: 180 });
+            box.style.display = 'block';
         }
 
         function bukaSimulasiPelanggan() {
@@ -2119,89 +2218,37 @@
         }
 
         function tutupSimulasi() {
-            nav('kasir');
-        }
-
-        function renderAudit() {
-            let tbody = document.querySelector('#table-audit tbody');
-            if(!tbody) return;
-            tbody.innerHTML = '';
-
-            db.audit_logs.forEach(log => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td><small style="color:#64748b;">${log.timestamp}</small></td>
-                        <td><b>${log.user_id}</b></td>
-                        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:600;">${log.action}</span></td>
-                        <td><small>${log.details}</small></td>
-                    </tr>
-                `;
-            });
-        }
-
-        function cetakStruk(tipe, indexOrder) {
-            let order = db.orders[indexOrder];
-            if (!order) return;
-
-            let printArea = document.getElementById('printable-area');
-            let namaToko = getSettingValue('namaToko', 'KEDAI KITA PRO');
-            let alamatToko = getSettingValue('alamatToko', 'Pusat Kota');
-            let footerNote = getSettingValue('footerNote', 'Terima kasih atas kunjungannya!');
-
-            if (tipe === 'dapur') {
-                printArea.innerHTML = `
-                    <div style="font-family:monospace; width:280px; padding:10px; font-size:12px;">
-                        <h3 style="text-align:center;">STRUK DAPUR</h3>
-                        <p><b>Meja:</b> ${order.meja}</p>
-                        <p><b>Waktu:</b> ${order.waktu}</p>
-                        <hr style="border-top:1px dashed #000;">
-                        <div>${order.rincian}</div>
-                        <hr style="border-top:1px dashed #000;">
-                    </div>
-                `;
-            } else {
-                printArea.innerHTML = `
-                    <div style="font-family:monospace; width:280px; padding:10px; font-size:12px;">
-                        <h3 style="text-align:center;">${namaToko}</h3>
-                        <p style="text-align:center; font-size:10px;">${alamatToko}</p>
-                        <hr style="border-top:1px dashed #000;">
-                        <p><b>Meja:</b> ${order.meja}</p>
-                        <p><b>Waktu:</b> ${order.waktu}</p>
-                        <p><b>Metode:</b> ${order.pembayaran || 'Tunai'}</p>
-                        <hr style="border-top:1px dashed #000;">
-                        <div>${order.rincian}</div>
-                        <hr style="border-top:1px dashed #000;">
-                        <p style="text-align:right;"><b>Total: Rp ${rp(order.total)}</b></p>
-                        ${order.uangDiterima ? `<p style="text-align:right;">Bayar: Rp ${rp(order.uangDiterima)}</p>` : ''}
-                        ${order.uangDiterima ? `<p style="text-align:right;">Kembali: Rp ${rp(order.uangDiterima - order.total)}</p>` : ''}
-                        <hr style="border-top:1px dashed #000;">
-                        <p style="text-align:center; font-size:10px;">${footerNote}</p>
-                    </div>
-                `;
-            }
-            window.print();
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-kasir').classList.add('active');
         }
 
         function exportPDF() {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            doc.setFontSize(16);
-            doc.text(getSettingValue('namaToko', 'KEDAI KITA PRO'), 14, 15);
+            let doc = new jsPDF();
+            doc.text("Laporan Keuangan KedaiApp Pro V9", 14, 15);
             doc.setFontSize(10);
-            doc.text("Laporan Keuangan & Penjualan", 14, 22);
+            doc.text(`Tanggal Cetak: ${new Date().toLocaleString('id-ID')}`, 14, 22);
 
-            let bodyData = db.orders.filter(o => o.status === 'selesai').map(o => [
-                o.waktu, o.meja, o.pembayaran || 'Tunai', `Rp ${rp(o.total)}`
-            ]);
+            let start = document.getElementById('filter-start')?.value;
+            let end = document.getElementById('filter-end')?.value;
+
+            let dataRows = [];
+            db.orders.filter(o => o.status === 'selesai').forEach(o => {
+                let dateStr = o.isoDate ? o.isoDate.split('T')[0] : '';
+                if (start && dateStr < start) return;
+                if (end && dateStr > end) return;
+
+                let rincianPlain = o.rincian.replace(/<br\s*[\/]?>/gi, ", ").replace(/<[^>]+>/g, "");
+                dataRows.push([o.waktu, o.meja, o.pembayaran || 'Tunai', rincianPlain, `Rp ${rp(o.total)}`]);
+            });
 
             doc.autoTable({
                 startY: 28,
-                head: [['Waktu', 'Meja', 'Pembayaran', 'Total']],
-                body: bodyData,
+                head: [['Waktu', 'Meja', 'Metode', 'Rincian', 'Total']],
+                body: dataRows,
             });
 
-            doc.save(`Laporan_Penjualan_${new Date().toISOString().split('T')[0]}.pdf`);
+            doc.save(`Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.pdf`);
         }
     </script>
 </body>
