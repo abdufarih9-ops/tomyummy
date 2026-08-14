@@ -1,0 +1,11 @@
+/* Sembunyikan elemen struk dari tampilan layar HP/Browser */
+.struk-preview, #struk {
+    display: none;
+}
+
+/* Hanya tampilkan saat proses cetak/print */
+@media print {
+    .struk-preview, #struk {
+        display: block;
+    }
+}
